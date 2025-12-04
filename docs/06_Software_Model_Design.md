@@ -7,6 +7,8 @@
 
 ## 6.2 Sequence Diagram (Purchase Item)
 
+This diagram illustrates the process flow when a user attempts to purchase an item from the shop.
+
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -32,6 +34,8 @@ sequenceDiagram
 ```
 
 ## 6.3 Entity Relationship Diagram (ERD)
+
+The ERD below represents the data structure for user interaction, attendance, and progression.
 
 ```mermaid
 erDiagram
@@ -94,12 +98,19 @@ Although utilizing NoSQL-style JSON storage, the strict typing enforces a schema
 
 ## 6.5 User Interface Design
 
-### Guidelines
-*   **Color Palette:** Retro Gold (`#ff9900`), Success Green (`#4ade80`), Danger Red (`#f87171`), Dark Background (`#1a1a1a`).
-*   **Typography:** 'VT323' (Monospace Pixel Font) for all text.
-*   **Feedback:** All interactive elements must provide visual (scale/color change) and auditory (chip sound) feedback.
+### 6.5.1 Rules and Guidelines for User Interface Designing
 
-### UI Mockup Descriptions
-1.  **Dashboard (Home):** Features the 3D Avatar center stage. Top bar displays Level, XP bar, and Gold. Bottom bar provides navigation tabs. Overlays include the "Boss Event" widget and "Weather" indicator.
-2.  **Manager Dashboard:** A tabbed interface. "Controls" allows setting global buffs. "Analytics" displays bar charts for productivity. "HR Dept" provides a table view of staff with action buttons (Edit, Ban, Smite).
-3.  **Shop:** A grid of cards displaying items. Owned items show "Equip", unowned show price. Top section features the "Mystery Box" Gacha mechanic.
+The following principles ensure a functional and engaging UI for gOwOrk:
+
+1.  **Input Validation:**
+    *   **Client-Side:** React state prevents submission of empty forms (e.g., Quest Creation). Buttons are disabled when criteria are not met (e.g., "Buy" button grayed out if insufficient Gold).
+    *   **Feedback:** Visual cues (red borders, shake animations) indicate invalid actions.
+
+2.  **Error Messages & Warnings:**
+    *   **Toast System:** All errors display as top-right toast notifications in red.
+    *   **Confirmation:** Critical actions (like "Reset Game Data") require a browser confirmation dialog (`window.confirm`) to prevent accidental data loss.
+
+3.  **Visual Language:**
+    *   **Color Palette:** Retro Gold (`#ff9900`) for rewards, Success Green (`#4ade80`) for actions, Danger Red (`#f87171`) for penalties/errors.
+    *   **Typography:** 'VT323' (Monospace Pixel Font) used universally to maintain the arcade aesthetic.
+    *   **Responsiveness:** Elements like the `ActionPad` scale from a 3-column grid on desktop to larger, touch-friendly buttons on mobile.
