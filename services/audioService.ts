@@ -95,7 +95,7 @@ class AudioService {
         this.currentNote++;
     }
 
-    playSfx(type: 'button' | 'coin' | 'error' | 'success') {
+    playSfx(type: 'button' | 'coin' | 'error' | 'success' | 'collect' | 'hurt' | 'miss' | 'gameover') {
         this.init();
         if (!this.ctx || !this.sfxGain) return;
         
@@ -138,6 +138,42 @@ class AudioService {
             gain.gain.linearRampToValueAtTime(0, now + 0.4);
             osc.start(now);
             osc.stop(now + 0.4);
+        } else if (type === 'collect') {
+             // High pitch chirp
+             osc.type = 'sine';
+             osc.frequency.setValueAtTime(1200, now);
+             osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
+             gain.gain.setValueAtTime(0.3, now);
+             gain.gain.linearRampToValueAtTime(0, now + 0.1);
+             osc.start(now);
+             osc.stop(now + 0.1);
+        } else if (type === 'hurt') {
+             // Low buzz
+             osc.type = 'sawtooth';
+             osc.frequency.setValueAtTime(150, now);
+             osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+             gain.gain.setValueAtTime(0.5, now);
+             gain.gain.linearRampToValueAtTime(0, now + 0.2);
+             osc.start(now);
+             osc.stop(now + 0.2);
+        } else if (type === 'miss') {
+             // Descending 'bloop'
+             osc.type = 'triangle';
+             osc.frequency.setValueAtTime(300, now);
+             osc.frequency.linearRampToValueAtTime(100, now + 0.15);
+             gain.gain.setValueAtTime(0.3, now);
+             gain.gain.linearRampToValueAtTime(0, now + 0.15);
+             osc.start(now);
+             osc.stop(now + 0.15);
+        } else if (type === 'gameover') {
+             // Sad slide
+             osc.type = 'triangle';
+             osc.frequency.setValueAtTime(400, now);
+             osc.frequency.linearRampToValueAtTime(100, now + 1.0);
+             gain.gain.setValueAtTime(0.5, now);
+             gain.gain.linearRampToValueAtTime(0, now + 1.0);
+             osc.start(now);
+             osc.stop(now + 1.0);
         }
     }
 }

@@ -109,7 +109,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   }
 
-  const playSfx = (type: 'button' | 'coin' | 'error' | 'success') => {
+  const playSfx = (type: 'button' | 'coin' | 'error' | 'success' | 'collect' | 'hurt' | 'miss' | 'gameover') => {
       if (!settings.isSfxMuted) audioService.playSfx(type);
   }
 

@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { X, Trophy, Play, Heart } from 'lucide-react';
+import { useGame } from '../context/GameContext';
 
 interface BonusGameProps {
   onClose: () => void;
@@ -8,6 +9,7 @@ interface BonusGameProps {
 }
 
 export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
+  const { playSfx } = useGame();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<'start' | 'playing' | 'gameover'>('start');
   const [score, setScore] = useState(0);
@@ -36,6 +38,7 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
     difficulty.current = 1;
     playerX.current = 50;
     lastSpawn.current = Date.now();
+    playSfx('button');
     loop();
   };
 
@@ -113,10 +116,12 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
             // HIT!
             if (item.type === 'bug') {
                 takeDamage();
+                playSfx('hurt');
             } else {
                 const points = item.type === 'coin' ? 50 : 10;
                 gameScore.current += points;
                 setScore(gameScore.current); // Sync to UI
+                playSfx('collect');
             }
             items.current.splice(i, 1);
         } else if (item.y > 1) {
@@ -124,6 +129,7 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
             if (item.type !== 'bug') {
                 // Missed a good item (coin or bean) -> lose a heart
                 takeDamage();
+                playSfx('miss');
             }
             items.current.splice(i, 1);
         }
@@ -154,6 +160,7 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
   const handleGameOver = () => {
     cancelAnimationFrame(frameId.current);
     setGameState('gameover');
+    playSfx('gameover');
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {

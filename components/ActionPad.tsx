@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
-import { Coffee, Armchair, Joystick, Lock, Clock } from 'lucide-react';
+import { Coffee, Armchair, Joystick, Lock, Clock, Ban } from 'lucide-react';
 
 interface ActionPadProps {
     onOpenArcade?: () => void;
 }
 
 export const ActionPad: React.FC<ActionPadProps> = ({ onOpenArcade }) => {
-  const { performWorkAction, takeBreak, user, weather, isShiftActive, globalModifiers } = useGame();
+  const { performWorkAction, takeBreak, user, weather, isShiftActive, globalModifiers, addToast } = useGame();
   const [breakCooldown, setBreakCooldown] = useState(0);
   const [arcadeCooldownStr, setArcadeCooldownStr] = useState<string | null>(null);
 
@@ -55,6 +55,10 @@ export const ActionPad: React.FC<ActionPadProps> = ({ onOpenArcade }) => {
   };
 
   const handleWork = () => {
+      if (breakCooldown > 0) {
+          addToast("You are on break! Relax.", "error");
+          return;
+      }
       if (isShiftActive) performWorkAction();
   }
 
@@ -66,6 +70,8 @@ export const ActionPad: React.FC<ActionPadProps> = ({ onOpenArcade }) => {
 
   const hasGoldBoost = user.unlocked_skills.includes('skill_barista_mastery') || globalModifiers.goldMultiplier > 1;
   const hasXpBoost = user.unlocked_skills.includes('skill_fast_learner') || globalModifiers.xpMultiplier > 1;
+
+  const isOnBreak = breakCooldown > 0;
 
   return (
     <div className={`grid grid-cols-3 gap-2 md:gap-4 mb-6 relative ${!isShiftActive ? 'opacity-70' : ''}`}>
@@ -79,18 +85,35 @@ export const ActionPad: React.FC<ActionPadProps> = ({ onOpenArcade }) => {
         {/* Work Button */}
         <button 
            onClick={handleWork}
-           disabled={!isShiftActive}
-           className="bg-blue-600 border-4 border-black p-2 md:p-4 text-white hover:bg-blue-500 active:scale-95 transition-all pixel-shadow relative overflow-hidden group disabled:cursor-not-allowed disabled:bg-gray-500"
+           disabled={!isShiftActive || isOnBreak}
+           className={`
+             border-4 border-black p-2 md:p-4 text-white transition-all pixel-shadow relative overflow-hidden group disabled:cursor-not-allowed 
+             ${!isShiftActive || isOnBreak ? 'bg-gray-500' : 'bg-blue-600 hover:bg-blue-500 active:scale-95'}
+           `}
         >
             <div className="relative z-10 flex flex-col items-center">
-                {!isShiftActive ? <Lock size={24} className="mb-1 md:mb-2"/> : <Coffee size={24} className="mb-1 md:mb-2" />}
-                <span className="font-bold uppercase text-sm md:text-lg">Serve</span>
+                {!isShiftActive ? (
+                    <Lock size={24} className="mb-1 md:mb-2"/> 
+                ) : isOnBreak ? (
+                    <Ban size={24} className="mb-1 md:mb-2 text-red-200" />
+                ) : (
+                    <Coffee size={24} className="mb-1 md:mb-2" />
+                )}
+                
+                <span className="font-bold uppercase text-sm md:text-lg">
+                    {isOnBreak ? 'Resting' : 'Serve'}
+                </span>
+                
                 <span className="text-[10px] opacity-80 mt-1 hidden md:block">
-                   - {weather === 'Snowy' ? 5 : 2} HP 
-                   {(hasGoldBoost || hasXpBoost) && <span className="text-yellow-300 font-bold ml-1 animate-pulse">^BOOST</span>}
+                   {isOnBreak ? `${breakCooldown}s Left` : (
+                       <>
+                        - {weather === 'Snowy' ? 5 : 2} HP 
+                        {(hasGoldBoost || hasXpBoost) && <span className="text-yellow-300 font-bold ml-1 animate-pulse">^BOOST</span>}
+                       </>
+                   )}
                 </span>
             </div>
-            {isShiftActive && <div className="absolute top-0 left-0 w-full h-full bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>}
+            {isShiftActive && !isOnBreak && <div className="absolute top-0 left-0 w-full h-full bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>}
         </button>
 
         {/* Break Button */}

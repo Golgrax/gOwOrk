@@ -187,5 +187,5 @@ export interface GameState {
   // Settings & Audio
   updateSettings: (newSettings: Partial<GameSettings>) => void;
   resetGameData: () => void;
-  playSfx: (type: 'button' | 'coin' | 'error' | 'success') => void;
+  playSfx: (type: 'button' | 'coin' | 'error' | 'success' | 'collect' | 'hurt' | 'miss' | 'gameover') => void;
 }
