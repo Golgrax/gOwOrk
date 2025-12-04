@@ -1,3 +1,4 @@
+
 # Chapter 4: Architectural Design
 
 ## 4.1 High-Level Components & Interfaces
