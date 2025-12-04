@@ -137,17 +137,38 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
 
     if (gameState === 'gameover') return;
 
-    // Draw Player
+    // Draw Floor / Bezel Area (Masks falling items)
     const px = (playerX.current / 100) * canvas.width;
     const py = PLAYER_Y * canvas.height;
+    const floorY = py + 20; // Start just below the player emoji baseline
     
+    // 1. Solid Floor Background
+    ctx.fillStyle = '#1a1a1a'; 
+    ctx.fillRect(0, floorY, canvas.width, canvas.height - floorY);
+    
+    // 2. Bezel Top Highlight Line
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, floorY, canvas.width, 6);
+
+    // 3. Subtle Stripe Pattern on Floor
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, floorY + 6, canvas.width, canvas.height - floorY - 6);
+    ctx.clip();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 4;
+    for(let i=-20; i<canvas.width; i+=20) {
+        ctx.beginPath();
+        ctx.moveTo(i, floorY);
+        ctx.lineTo(i-10, canvas.height);
+        ctx.stroke();
+    }
+    ctx.restore();
+
+    // Draw Player
     ctx.font = '40px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('☕', px, py); // Player Avatar
-
-    // Debug / Floor
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, py + 20, canvas.width, 10);
 
     frameId.current = requestAnimationFrame(loop);
   };
@@ -258,12 +279,45 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
            )}
         </div>
         
-        {/* Footer Hint */}
-        {gameState === 'playing' && (
-           <div className="bg-black text-white p-2 text-center text-xs shrink-0">
-              TOUCH & DRAG TO MOVE CUP ☕
-           </div>
-        )}
+        {/* Arcade Footer Control Panel */}
+        <div className="bg-gray-900 border-t-4 border-black p-4 shrink-0 flex items-center justify-between relative shadow-inner overflow-hidden">
+            {/* Texture overlay */}
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:4px_4px] pointer-events-none"></div>
+
+            {/* D-Pad (Visual) */}
+            <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center opacity-80 shrink-0">
+                <div className="w-5 h-14 md:w-6 md:h-16 bg-gray-700 rounded absolute shadow-md border border-gray-900"></div>
+                <div className="w-14 h-5 md:w-16 md:h-6 bg-gray-700 rounded absolute shadow-md border border-gray-900"></div>
+                <div className="w-4 h-4 bg-gray-800 rounded-full z-10 shadow-inner"></div>
+                {/* Arrow highlights */}
+                <div className="absolute top-0 text-[8px] text-gray-500 font-bold">▲</div>
+                <div className="absolute bottom-0 text-[8px] text-gray-500 font-bold">▼</div>
+                <div className="absolute left-0 text-[8px] text-gray-500 font-bold">◀</div>
+                <div className="absolute right-0 text-[8px] text-gray-500 font-bold">▶</div>
+            </div>
+
+            {/* Center Instruction (Visual) */}
+            <div className="z-10 text-center flex flex-col items-center mx-2">
+                 <div className="bg-black border-2 border-gray-600 px-3 py-1 mb-1 shadow-[0_0_10px_rgba(255,165,0,0.2)]">
+                     <span className={`text-[10px] md:text-xs font-bold tracking-widest whitespace-nowrap ${gameState === 'playing' ? 'text-retro-gold animate-pulse' : 'text-gray-400'}`}>
+                         {gameState === 'playing' ? 'DRAG TO MOVE' : gameState === 'gameover' ? 'INSERT COIN' : 'PRESS START'}
+                     </span>
+                 </div>
+                 <div className="text-[8px] md:text-[10px] text-gray-500 font-mono uppercase">1 Player Mode</div>
+            </div>
+
+            {/* A/B Buttons (Visual) */}
+            <div className="flex gap-2 md:gap-3 pr-2 opacity-90 shrink-0">
+                <div className="flex flex-col items-center translate-y-2">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-600 border-b-4 border-red-900 shadow-lg active:translate-y-1 active:border-b-0 transition-transform"></div>
+                    <span className="text-[10px] font-bold text-gray-400 mt-1">B</span>
+                </div>
+                <div className="flex flex-col items-center -translate-y-1">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-600 border-b-4 border-green-900 shadow-lg active:translate-y-1 active:border-b-0 transition-transform"></div>
+                    <span className="text-[10px] font-bold text-gray-400 mt-1">A</span>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );
