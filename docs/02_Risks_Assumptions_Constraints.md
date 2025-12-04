@@ -18,6 +18,6 @@
 
 ## 2.3 Constraints
 *   **Technological Constraint:** The application must run entirely client-side without a mandatory backend server requirement for the MVP (Minimum Viable Product).
-*   **Budget:** Zero-cost infrastructure is prioritized (hosting on static platforms like Vercel/GitHub Pages).
+*   **Budget:** Zero-cost infrastructure is prioritized (hosting on static platforms like Vercel, GitHub Pages).
 *   **Time:** Real-time synchronization between users (e.g., chat) is limited by the lack of WebSockets in the current architecture.
 *   **Storage:** Browser LocalStorage is limited (typically 5MB), restricting the infinite growth of log history.
