@@ -184,10 +184,10 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md bg-retro-bg border-4 border-black pixel-shadow overflow-hidden flex flex-col h-[600px]">
+      <div className="relative w-full max-w-md bg-retro-bg border-4 border-black pixel-shadow overflow-hidden flex flex-col h-[600px] max-h-[85vh]">
         
         {/* Header */}
-        <div className="bg-black text-retro-gold p-4 flex justify-between items-center z-10">
+        <div className="bg-black text-retro-gold p-4 flex justify-between items-center z-10 shrink-0">
           <div className="flex items-center gap-4">
               <div className="font-bold text-xl uppercase flex items-center gap-2">
                  <Trophy size={20} /> {score}
@@ -204,7 +204,7 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
         </div>
 
         {/* Canvas Layer */}
-        <div className="relative flex-1 bg-[#f0e6d2] cursor-crosshair">
+        <div className="relative flex-1 bg-[#f0e6d2] cursor-crosshair min-h-0">
            <canvas
              ref={canvasRef}
              width={400}
@@ -260,7 +260,7 @@ export const BonusGame: React.FC<BonusGameProps> = ({ onClose, onReward }) => {
         
         {/* Footer Hint */}
         {gameState === 'playing' && (
-           <div className="bg-black text-white p-2 text-center text-xs">
+           <div className="bg-black text-white p-2 text-center text-xs shrink-0">
               TOUCH & DRAG TO MOVE CUP ☕
            </div>
         )}
