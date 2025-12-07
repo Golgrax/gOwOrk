@@ -181,8 +181,6 @@ export interface GameState {
   submitQuest: (questId: string) => void; // User submits
   approveQuest: (userId: string, questId: string) => Promise<void>; // Admin approves
   rejectQuest: (userId: string, questId: string) => Promise<void>; // Admin rejects
-  bulkApproveQuests: (submissions: QuestSubmission[]) => Promise<void>;
-  bulkRejectQuests: (submissions: QuestSubmission[]) => Promise<void>;
   getPendingSubmissions: () => Promise<QuestSubmission[]>;
   toggleOverdrive: () => void;
   buyItem: (itemId: string) => void;
@@ -193,7 +191,7 @@ export interface GameState {
   takeBreak: () => void;
   addToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   consumeItem: (itemId: string) => void;
-  spinWheel: () => { reward: string, value: number, type: 'gold' | 'xp' | 'hp' };
+  spinWheel: () => { reward: string, value: number, type: 'gold' | 'xp' | 'hp', prizeId: string };
   unlockSkill: (skillId: string) => void;
   sendKudos: (targetUserId: string) => void;
   recordArcadePlay: () => void;

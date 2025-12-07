@@ -364,45 +364,14 @@ class GameService {
 
       this.damageBoss(50);
       
-      // Update local user if it's me
-      if (this.user && this.user.id === userId) {
-          this.user.current_gold += qRow.reward_gold;
-          this.user.current_xp += qRow.reward_xp;
-          this.checkLevelUp();
-      }
-      
       if(this.user) this.logAction(this.user.id, 'ADMIN', `Approved Quest '${qRow.title}' for user ${userId}`);
   }
 
   async rejectQuest(userId: string, questId: string) {
       // Deleting the row allows them to try again
       sqliteService.run(`DELETE FROM completed_quests WHERE user_id = ? AND quest_id = ?`, [userId, questId]);
-      
       if(this.user) this.logAction(this.user.id, 'ADMIN', `Rejected Quest for user ${userId}`);
   }
-
-  async bulkApproveQuests(submissions: QuestSubmission[]) {
-      for (const sub of submissions) {
-          try {
-              await this.approveQuest(sub.user_id, sub.quest_id);
-          } catch(e) {
-              console.error(`Failed to approve ${sub.quest_id}`, e);
-          }
-      }
-      if(this.user) this.logAction(this.user.id, 'ADMIN', `Bulk Approved ${submissions.length} Quests`);
-  }
-
-  async bulkRejectQuests(submissions: QuestSubmission[]) {
-      for (const sub of submissions) {
-          try {
-              await this.rejectQuest(sub.user_id, sub.quest_id);
-          } catch(e) {
-              console.error(`Failed to reject ${sub.quest_id}`, e);
-          }
-      }
-      if(this.user) this.logAction(this.user.id, 'ADMIN', `Bulk Rejected ${submissions.length} Quests`);
-  }
-
 
   // --- ATTENDANCE (SQLITE) ---
 

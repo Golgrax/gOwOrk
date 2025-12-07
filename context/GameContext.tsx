@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
@@ -217,16 +218,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addToast('Quest Rejected', 'info');
   }
 
-  const bulkApproveQuests = async (submissions: QuestSubmission[]) => {
-      await gameService.bulkApproveQuests(submissions);
-      addToast(`Approved ${submissions.length} requests`, 'success');
-  }
-
-  const bulkRejectQuests = async (submissions: QuestSubmission[]) => {
-      await gameService.bulkRejectQuests(submissions);
-      addToast(`Rejected ${submissions.length} requests`, 'info');
-  }
-
   const getPendingSubmissions = async () => {
       return await gameService.getPendingSubmissions();
   }
@@ -363,7 +354,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       user,
       activeQuests,
       userQuestStatuses,
-      completedQuestIds: [], // Deprecated in favor of userQuestStatuses, kept for TS compat if needed but unused in new logic
       todayLog,
       isOverdrive,
       isShiftActive,
@@ -387,8 +377,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       submitQuest,
       approveQuest,
       rejectQuest,
-      bulkApproveQuests,
-      bulkRejectQuests,
       getPendingSubmissions,
       toggleOverdrive,
       buyItem,

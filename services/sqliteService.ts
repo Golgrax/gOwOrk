@@ -4,6 +4,7 @@ import initSqlJs, { Database, QueryExecResult } from 'sql.js';
 class SqliteService {
   db: Database | null = null;
   private initPromise: Promise<void> | null = null;
+  private autoSaveEnabled = true;
 
   async init() {
     if (this.initPromise) return this.initPromise;
@@ -11,7 +12,6 @@ class SqliteService {
     this.initPromise = new Promise(async (resolve, reject) => {
       try {
         // Manually fetch WASM to avoid environment detection issues (e.g. unenv polyfilling fs)
-        // This prevents the library from trying to use fs.readFileSync
         const wasmUrl = 'https://sql.js.org/dist/sql-wasm.wasm';
         const wasmResponse = await fetch(wasmUrl);
         if (!wasmResponse.ok) throw new Error(`Failed to load WASM: ${wasmResponse.statusText}`);
@@ -163,14 +163,45 @@ class SqliteService {
   run(sql: string, params?: any[]) {
       if (!this.db) throw new Error("DB not initialized");
       this.db.run(sql, params);
-      this.save();
+      if (this.autoSaveEnabled) {
+          this.save();
+      }
+  }
+
+  // Optimizations for bulk operations
+  disableAutoSave() {
+      this.autoSaveEnabled = false;
+  }
+
+  enableAutoSave() {
+      this.autoSaveEnabled = true;
+      this.save(); // Trigger delayed save
+  }
+
+  runBatch(queries: {sql: string, params: any[]}[]) {
+      if (!this.db) throw new Error("DB not initialized");
+      this.db.exec("BEGIN TRANSACTION");
+      try {
+          for (const q of queries) {
+              this.db.run(q.sql, q.params);
+          }
+          this.db.exec("COMMIT");
+          if (this.autoSaveEnabled) this.save();
+      } catch (e) {
+          this.db.exec("ROLLBACK");
+          throw e;
+      }
   }
 
   save() {
       if (!this.db) return;
-      const data = this.db.export();
-      const base64 = this.uint8ArrayToBase64(data);
-      localStorage.setItem('gowork_sqlite_db', base64);
+      try {
+          const data = this.db.export();
+          const base64 = this.uint8ArrayToBase64(data);
+          localStorage.setItem('gowork_sqlite_db', base64);
+      } catch (e) {
+          console.error("Failed to save DB to local storage", e);
+      }
   }
 
   // Utils for persistence

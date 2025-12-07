@@ -19,12 +19,13 @@ import { DailySpin } from './components/DailySpin';
 import { SkillTree } from './components/SkillTree';
 import { PetWidget } from './components/PetWidget';
 import { SettingsModal } from './components/SettingsModal';
-import { Home, ShoppingBag, User as UserIcon, ClipboardList, LogOut, CloudRain, Sun, Snowflake, Flame, CloudFog, Eye, EyeOff, Gift, Lock, Star, Settings } from 'lucide-react';
+import { SecurityMonitor } from './components/SecurityMonitor';
+import { Home, ShoppingBag, User as UserIcon, ClipboardList, LogOut, CloudRain, Sun, Snowflake, Flame, CloudFog, Eye, EyeOff, Gift, Lock, Star, Settings, Camera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 const GameLayout: React.FC = () => {
   const { user, isOverdrive, logout, weather, addGold, addXp, addToast, isShiftActive, recordArcadePlay, playSfx, settings } = useGame();
-  const [currentView, setCurrentView] = useState<'home' | 'shop' | 'profile' | 'admin' | 'skills'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'shop' | 'profile' | 'admin' | 'skills' | 'security'>('home');
   const [showArcade, setShowArcade] = useState(false);
   const [showDailySpin, setShowDailySpin] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -68,6 +69,7 @@ const GameLayout: React.FC = () => {
         case 'profile': return <Profile />;
         case 'skills': return <SkillTree />;
         case 'admin': return <ManagerDashboard />;
+        case 'security': return <SecurityMonitor />;
         default: return (
            <div className="space-y-6">
               <BossWidget />
@@ -164,7 +166,7 @@ const GameLayout: React.FC = () => {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="bg-white border-t-4 border-black p-2 flex justify-around items-center pixel-shadow pb-safe pointer-events-auto">
+        <nav className="bg-white border-t-4 border-black p-2 flex justify-around items-center pixel-shadow pb-safe pointer-events-auto overflow-x-auto">
            <NavButton 
               icon={<Home />} 
               label="Work" 
@@ -190,16 +192,24 @@ const GameLayout: React.FC = () => {
               onClick={() => { setCurrentView('profile'); playSfx('button'); }} 
            />
            {(user.role === 'manager' || user.role === 'moderator') && (
-             <NavButton 
-                icon={<ClipboardList />} 
-                label="Admin" 
-                active={currentView === 'admin'} 
-                onClick={() => { setCurrentView('admin'); playSfx('button'); }} 
-             />
+               <>
+                 <NavButton 
+                    icon={<ClipboardList />} 
+                    label="Admin" 
+                    active={currentView === 'admin'} 
+                    onClick={() => { setCurrentView('admin'); playSfx('button'); }} 
+                 />
+                 <NavButton 
+                    icon={<Camera />} 
+                    label="Monitor" 
+                    active={currentView === 'security'} 
+                    onClick={() => { setCurrentView('security'); playSfx('button'); }} 
+                 />
+               </>
            )}
            <button 
               onClick={logout}
-              className="flex flex-col items-center p-2 text-red-500 hover:text-red-700"
+              className="flex flex-col items-center p-2 text-red-500 hover:text-red-700 min-w-[50px]"
            >
               <LogOut size={24} />
               <span className="text-xs font-bold">EXIT</span>
@@ -220,7 +230,7 @@ const GameLayout: React.FC = () => {
 const NavButton: React.FC<{ icon: React.ReactNode, label: string, active: boolean, onClick: () => void }> = ({ icon, label, active, onClick }) => (
    <button 
       onClick={onClick}
-      className={`flex flex-col items-center p-2 transition-all ${active ? 'text-retro-goldDark -translate-y-2' : 'text-gray-500'}`}
+      className={`flex flex-col items-center p-2 transition-all min-w-[50px] ${active ? 'text-retro-goldDark -translate-y-2' : 'text-gray-500'}`}
    >
       <div className={`${active ? 'scale-125' : ''} transition-transform`}>{icon}</div>
       <span className="text-xs font-bold uppercase">{label}</span>
