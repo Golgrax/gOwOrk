@@ -33,15 +33,15 @@ flowchart LR
 
     subgraph System
         direction TB
-        UC1([Login / Authentication])
-        UC2([Clock In/Out])
-        UC3([Perform Work Action])
-        UC4([Purchase Items & Customize])
-        UC5([Play Minigame (Arcade)])
-        UC6([Manage Staff (Ban/Edit)])
-        UC7([View Analytics])
-        UC8([Create Quests])
-        UC9([Export Payroll CSV])
+        UC1(["Login / Authentication"])
+        UC2(["Clock In/Out"])
+        UC3(["Perform Work Action"])
+        UC4(["Purchase Items & Customize"])
+        UC5(["Play Minigame (Arcade)"])
+        UC6(["Manage Staff (Ban/Edit)"])
+        UC7(["View Analytics"])
+        UC8(["Create Quests"])
+        UC9(["Export Payroll CSV"])
     end
 
     E --> UC1
