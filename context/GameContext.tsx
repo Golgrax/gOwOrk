@@ -5,7 +5,12 @@ import { gameService } from '../services/gameService';
 import { audioService } from '../services/audioService';
 import confetti from 'canvas-confetti';
 
-const GameContext = createContext<GameState | undefined>(undefined);
+// Extend GameState to support password in login
+interface ExtendedGameState extends Omit<GameState, 'login'> {
+    login: (username: string, password?: string) => Promise<void>;
+}
+
+const GameContext = createContext<ExtendedGameState | undefined>(undefined);
 
 export const useGame = () => {
   const context = useContext(GameContext);
@@ -32,35 +37,39 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [settings, setSettings] = useState<GameSettings>({
       musicVolume: 0.5,
       sfxVolume: 0.8,
-      isMusicMuted: true, // Default to muted to avoid auto-play blocking
+      isMusicMuted: true,
       isSfxMuted: false,
       lowPerformanceMode: false
   });
 
-  // Derived state
   const isShiftActive = !!(todayLog && !todayLog.time_out);
 
   useEffect(() => {
+    // Initial Load
     const init = async () => {
-      const u = await gameService.getUserProfile();
-      if (u) {
-        setUser(u);
-        const log = await gameService.getTodayLog();
-        setTodayLog(log);
-        refreshGameData();
-      }
-      setWeatherState(gameService.getWeather());
-      setMotdState(gameService.getMotd());
-      setGlobalModifiers(gameService.getGlobalModifiers());
+      try {
+          const u = await gameService.getUserProfile();
+          if (u) {
+            setUser(u);
+            const log = await gameService.getTodayLog();
+            setTodayLog(log);
+            refreshGameData();
+          }
+          setWeatherState(gameService.getWeather());
+          setMotdState(gameService.getMotd());
+          setGlobalModifiers(gameService.getGlobalModifiers());
 
-      // Load Settings
-      const savedSettings = localStorage.getItem('gowork_settings');
-      if (savedSettings) {
-          const parsed = JSON.parse(savedSettings);
-          setSettings(parsed);
-          audioService.setVolumes(parsed.musicVolume, parsed.sfxVolume, parsed.isMusicMuted, parsed.isSfxMuted);
-      } else {
-          audioService.setVolumes(0.5, 0.8, true, false);
+          // Load Settings
+          const savedSettings = localStorage.getItem('gowork_settings');
+          if (savedSettings) {
+              const parsed = JSON.parse(savedSettings);
+              setSettings(parsed);
+              audioService.setVolumes(parsed.musicVolume, parsed.sfxVolume, parsed.isMusicMuted, parsed.isSfxMuted);
+          } else {
+              audioService.setVolumes(0.5, 0.8, true, false);
+          }
+      } catch (e) {
+          console.error("Init failed", e);
       }
     };
     init();
@@ -72,18 +81,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => clearInterval(interval);
   }, []);
 
-  // Update Audio Service whenever settings change
   useEffect(() => {
       audioService.setVolumes(settings.musicVolume, settings.sfxVolume, settings.isMusicMuted, settings.isSfxMuted);
-      
-      // Strict Playback Logic: Only play if logged in AND unmuted
       if (!settings.isMusicMuted && user) {
           audioService.startMusic();
       } else {
-          // If muted OR logged out (handled by logout(), but explicit check here helps edge cases)
           if (settings.isMusicMuted) audioService.stopMusic();
       }
-  }, [settings, user]); // User dependency ensures music starts/stops on login/logout if settings allow
+  }, [settings, user]);
 
   const refreshGameData = async () => {
       const q = await gameService.getQuests();
@@ -109,19 +114,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   }
 
-  const playSfx = (type: 'button' | 'coin' | 'error' | 'success' | 'collect' | 'hurt' | 'miss' | 'gameover') => {
+  const playSfx = (type: any) => {
       if (!settings.isSfxMuted) audioService.playSfx(type);
   }
 
   const addToast = (msg: string, type: 'success' | 'error' | 'info') => {
       const id = Date.now().toString();
       setToasts(prev => [...prev, { id, message: msg, type }]);
-      
-      // Play sound based on toast type
       if (type === 'success') playSfx('success');
       else if (type === 'error') playSfx('error');
       else playSfx('button');
-
       setTimeout(() => {
           setToasts(prev => prev.filter(t => t.id !== id));
       }, 3000);
@@ -139,19 +141,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addToast("MOTD Updated", 'success');
   };
 
-  const login = async (username: string) => {
+  const login = async (username: string, password?: string) => {
       try {
-          const u = await gameService.login(username);
+          const u = await gameService.login(username, password);
           setUser(u);
           const log = await gameService.getTodayLog(new Date(Date.now() + timeOffset));
           setTodayLog(log);
           refreshGameData();
           playSfx('success');
-          
-          // Music logic handled by useEffect on [user]
       } catch (e: any) {
           playSfx('error');
-          throw e; // Bubble up to login component
+          throw e;
       }
   };
 
@@ -201,16 +201,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setBossEvent(gameService.getBossEvent()); 
       addToast(`Quest Complete! +${reward} Gold`, 'success');
       playSfx('coin');
-      
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#FFD700', '#FFA500']
-      });
-      
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#FFD700', '#FFA500'] });
     } catch (e: any) {
-      console.error(e);
       addToast(e.message, 'error');
     }
   };
@@ -226,16 +218,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const consumeItem = async (itemId: string) => {
-     await buyItem(itemId);
-  };
+  const consumeItem = async (itemId: string) => { await buyItem(itemId); };
 
   const equipItem = async (type: keyof AvatarConfig, assetId: string) => {
       const u = await gameService.equipItem(type, assetId);
-      if(u) {
-          setUser({...u});
-          addToast('Item Equipped!', 'info');
-      }
+      if(u) { setUser({...u}); addToast('Item Equipped!', 'info'); }
   };
 
   const createQuest = async (quest: Omit<Quest, 'id' | 'expiresAt'>, durationHours: number) => {
@@ -273,7 +260,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const spinWheel = () => {
       try {
           const result = gameService.spinWheel();
-          // Force update local user state
           gameService.getUserProfile().then(u => setUser(u));
           return result;
       } catch (e: any) {
@@ -288,11 +274,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser({...u});
           addToast('Skill Unlocked!', 'success');
           playSfx('success');
-          confetti({
-             particleCount: 50,
-             spread: 60,
-             origin: { y: 0.7 }
-          });
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
       } catch(e: any) {
           addToast(e.message, 'error');
       }
@@ -312,26 +294,19 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser({...u});
   }
 
-  const feedPet = () => {
+  const feedPet = async () => {
       try {
-          const { user: u, msg } = gameService.feedPet();
+          const { user: u, msg } = await gameService.feedPet();
           setUser({...u});
           addToast(msg, 'success');
-          confetti({
-              particleCount: 30,
-              spread: 50,
-              origin: { y: 0.8 },
-              colors: ['#FF69B4', '#FFF']
-          });
+          confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 }, colors: ['#FF69B4', '#FFF'] });
       } catch(e: any) {
           addToast(e.message, 'error');
       }
   };
   
-  const getTeamData = async () => {
-      return await gameService.getTeamData();
-  }
-
+  const getTeamData = async () => { return await gameService.getTeamData(); }
+  
   const giveBonus = async (userId: string, amount: number) => {
       await gameService.giveBonus(userId, amount);
       addToast(`Sent ${amount}G Bonus`, 'success');
@@ -350,20 +325,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   // Admin Features
-  const exportData = async () => {
-     return await gameService.exportAttendanceCSV();
-  }
-
-  const toggleBan = async (userId: string) => {
-     await gameService.toggleBan(userId);
-     addToast('User Ban Status Updated', 'info');
-  }
-
-  const updateUser = async (userId: string, data: Partial<User>) => {
-     await gameService.updateUser(userId, data);
-     addToast('User Profile Updated', 'success');
-  }
-
+  const exportData = async () => { return await gameService.exportAttendanceCSV(); }
+  const toggleBan = async (userId: string) => { await gameService.toggleBan(userId); addToast('User Ban Status Updated', 'info'); }
+  const updateUser = async (userId: string, data: Partial<User>) => { await gameService.updateUser(userId, data); addToast('User Profile Updated', 'success'); }
   const punishUser = async (userId: string, type: 'gold' | 'xp' | 'hp', amount: number) => {
      await gameService.adminPunish(userId, type, amount);
      addToast(`Penalty Applied (-${amount} ${type.toUpperCase()})`, 'error');
