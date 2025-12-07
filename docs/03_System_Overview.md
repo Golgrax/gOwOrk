@@ -31,7 +31,7 @@ usecaseDiagram
     actor "Employee" as E
     actor "Manager" as M
 
-    package "gOwOrk System" {
+    package System {
         usecase "Login / Authentication" as UC1
         usecase "Clock In/Out" as UC2
         usecase "Perform Work Action" as UC3
