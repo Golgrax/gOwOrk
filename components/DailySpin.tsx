@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { gameService } from '../services/gameService';
-import { X, Gift } from 'lucide-react';
+import { gameService, WHEEL_PRIZES, WheelPrize } from '../services/gameService';
+import { X, Gift, Heart, Coins, Star, Crown, ChevronDown } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface DailySpinProps {
@@ -10,66 +10,156 @@ interface DailySpinProps {
 }
 
 export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
-  const { spinWheel } = useGame();
+  const { spinWheel, playSfx } = useGame();
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [rotation, setRotation] = useState(0);
+  const [result, setResult] = useState<WheelPrize | null>(null);
+
+  const SEGMENT_ANGLE = 360 / WHEEL_PRIZES.length;
 
   const handleSpin = () => {
+    if (spinning) return;
     setSpinning(true);
+    playSfx('button');
+
+    // 1. Get the result immediately from logic
+    const outcome = spinWheel(); // Returns { prizeId, ... }
+    const prizeIndex = WHEEL_PRIZES.findIndex(p => p.id === outcome.prizeId);
+    
+    // 2. Calculate mapped target angle
+    // Logic: The wheel container rotates. We want the center of the selected segment to align with the Top Pointer (0 deg).
+    // Segment 0 center is at Angle/2.
+    // To bring Angle/2 to 0, we rotate by -Angle/2.
+    
+    const segmentCenter = (prizeIndex * SEGMENT_ANGLE) + (SEGMENT_ANGLE / 2);
+    const targetBase = -segmentCenter; 
+    
+    // Add multiple full spins (ensure it spins enough)
+    const fullSpins = 360 * 8; 
+    
+    // Add a tiny jitter (+/- 2 deg) so it doesn't look robotic
+    const jitter = (Math.random() * 4) - 2;
+
+    const finalRotation = targetBase - fullSpins + jitter;
+
+    // 3. Animate
+    setRotation(finalRotation);
+
+    // 4. Wait for animation
     setTimeout(() => {
-        try {
-            const outcome = spinWheel();
-            setResult(outcome.reward);
-            confetti({
-                particleCount: 150,
-                spread: 100,
-                origin: { y: 0.5 }
-            });
-        } catch (e) {
-            setResult("Error");
-        }
+        setResult(WHEEL_PRIZES[prizeIndex]);
         setSpinning(false);
-    }, 2000);
+        playSfx('success');
+        confetti({
+             particleCount: 200,
+             spread: 100,
+             origin: { y: 0.5 },
+             colors: [WHEEL_PRIZES[prizeIndex].color, '#ffffff']
+        });
+    }, 4000); // 4s matches CSS transition duration
   };
 
   const canSpin = gameService.canSpin();
 
+  const getIcon = (type: string) => {
+      if (type === 'gold') return <Coins size={20} />;
+      if (type === 'xp') return <Star size={20} />;
+      if (type === 'hp') return <Heart size={20} fill="white" />;
+      return <Crown size={20} />;
+  }
+
+  // Create Conic Gradient for background
+  const gradient = `conic-gradient(${
+      WHEEL_PRIZES.map((p, i) => {
+          const start = i * (100 / WHEEL_PRIZES.length);
+          const end = (i + 1) * (100 / WHEEL_PRIZES.length);
+          return `${p.color} ${start}% ${end}%`;
+      }).join(', ')
+  })`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-retro-bg border-4 border-black pixel-shadow p-6 text-center max-w-sm w-full relative">
+        <div className="bg-retro-bg border-4 border-black pixel-shadow p-6 text-center max-w-sm w-full relative overflow-hidden">
             <button onClick={onClose} className="absolute top-2 right-2 text-black hover:text-red-500 z-10">
                 <X size={24} />
             </button>
             
-            <h2 className="text-2xl font-bold uppercase mb-4 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold uppercase mb-2 flex items-center justify-center gap-2">
                 <Gift className="text-retro-gold" /> Daily Spin
             </h2>
+            
+            {!canSpin && !result && (
+                <div className="text-xs font-bold text-red-500 mb-2">You already spun today!</div>
+            )}
 
-            {!result ? (
-                <div className="py-8">
-                    {canSpin ? (
-                        <>
-                         <div className={`text-6xl mb-6 ${spinning ? 'animate-spin' : ''}`}>🎡</div>
-                         <button 
-                            onClick={handleSpin} 
-                            disabled={spinning}
-                            className="bg-retro-green border-4 border-black px-6 py-3 text-xl font-bold uppercase hover:scale-105 transition-transform"
-                         >
-                            {spinning ? 'SPINNING...' : 'SPIN NOW'}
-                         </button>
-                        </>
-                    ) : (
-                        <div className="text-gray-500 font-bold">
-                            ALREADY SPUN TODAY!<br/>COME BACK TOMORROW.
+            <div className="relative w-72 h-72 mx-auto my-6">
+                {/* Pointer */}
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 text-black drop-shadow-xl filter">
+                    <ChevronDown size={64} fill="black" strokeWidth={3} className="text-white" />
+                </div>
+
+                {/* Wheel Container */}
+                <div 
+                    className="w-full h-full rounded-full border-4 border-black relative overflow-hidden shadow-xl"
+                    style={{ 
+                        background: gradient,
+                        transform: `rotate(${rotation}deg)`,
+                        transition: spinning ? 'transform 4s cubic-bezier(0.1, 0, 0.2, 1)' : 'none'
+                    }}
+                >
+                    {/* Segments Text */}
+                    {WHEEL_PRIZES.map((prize, i) => (
+                        <div 
+                            key={prize.id}
+                            className="absolute top-1/2 left-1/2 w-full h-0 -translate-y-1/2 origin-left flex items-center"
+                            style={{ 
+                                // Subtract 90deg to align text (Right 3 o'clock) with Slice Center (Top 12 o'clock)
+                                transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE/2) - 90}deg)` 
+                            }}
+                        >
+                            <div className="pl-10 flex items-center gap-2 font-black text-lg text-white uppercase tracking-wider" 
+                                 style={{ 
+                                     textShadow: '3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'
+                                 }}>
+                                <span>{prize.label}</span>
+                                {getIcon(prize.type)}
+                            </div>
                         </div>
-                    )}
+                    ))}
+                    
+                    {/* Inner Circle (Hub) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white border-4 border-black rounded-full z-10 flex items-center justify-center">
+                        <div className="w-3 h-3 bg-black rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            {result ? (
+                <div className="animate-in fade-in zoom-in duration-300">
+                    <div className="text-sm uppercase text-gray-500">You Won</div>
+                    <div className="text-4xl font-black my-4 uppercase" style={{ color: result.color, textShadow: '2px 2px 0 #000' }}>
+                        {result.label}
+                    </div>
+                    <button 
+                        onClick={onClose} 
+                        className="bg-black text-white px-8 py-3 font-bold uppercase hover:bg-gray-800 text-xl"
+                    >
+                        Claim Prize
+                    </button>
                 </div>
             ) : (
-                <div className="py-8">
-                    <div className="text-sm uppercase text-gray-500">YOU WON</div>
-                    <div className="text-4xl font-bold text-retro-goldDark my-4 animate-bounce">{result}</div>
-                    <button onClick={onClose} className="mt-4 text-sm font-bold underline hover:text-red-500">Close</button>
-                </div>
+                <button 
+                   onClick={handleSpin} 
+                   disabled={!canSpin || spinning}
+                   className={`
+                      w-full border-4 border-black px-6 py-4 text-2xl font-black uppercase transition-transform
+                      ${canSpin 
+                          ? 'bg-retro-gold hover:bg-yellow-400 hover:scale-105 active:scale-95' 
+                          : 'bg-gray-400 cursor-not-allowed text-gray-700 opacity-50'}
+                   `}
+                >
+                   {spinning ? 'Good Luck...' : 'SPIN!'}
+                </button>
             )}
         </div>
     </div>

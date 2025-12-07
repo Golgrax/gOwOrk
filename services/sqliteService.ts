@@ -27,8 +27,11 @@ class SqliteService {
            this.db = new SQL.Database(binary);
         } else {
            this.db = new SQL.Database();
-           this.runMigrations();
         }
+        
+        // Always run migrations to ensure new tables exist
+        this.runMigrations();
+        
         resolve();
       } catch (e) {
         console.error("Failed to init SQLite", e);
@@ -78,6 +81,16 @@ class SqliteService {
             xp_earned INTEGER,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+        
+        -- New Audit Logs for Admin
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            action_type TEXT, -- 'SPIN', 'SHOP', 'QUEST', 'ADMIN', 'ARCADE'
+            details TEXT,
+            timestamp INTEGER,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
 
         CREATE TABLE IF NOT EXISTS active_quests (
             id TEXT PRIMARY KEY,
@@ -92,6 +105,7 @@ class SqliteService {
         CREATE TABLE IF NOT EXISTS completed_quests (
             user_id TEXT,
             quest_id TEXT,
+            status TEXT DEFAULT 'pending', -- 'pending' | 'approved'
             PRIMARY KEY (user_id, quest_id),
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
@@ -103,6 +117,14 @@ class SqliteService {
         );
       `;
       this.db.run(schema);
+
+      // Manual Migration for existing databases to add status column
+      try {
+          this.db.exec("ALTER TABLE completed_quests ADD COLUMN status TEXT DEFAULT 'approved'");
+      } catch (e) {
+          // Column likely exists or table just created
+      }
+
       this.save();
   }
 

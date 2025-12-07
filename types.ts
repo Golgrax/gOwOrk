@@ -1,4 +1,5 @@
 
+
 export interface AvatarConfig {
   hat: string;
   eyes: string;
@@ -7,7 +8,7 @@ export interface AvatarConfig {
   accessory?: string;
 }
 
-export type UserRole = 'employee' | 'manager';
+export type UserRole = 'employee' | 'manager' | 'moderator';
 
 export interface ShopItem {
   id: string;
@@ -79,6 +80,15 @@ export interface AttendanceLog {
   xp_earned: number;
 }
 
+export interface AuditLog {
+    id: string;
+    user_id: string;
+    user_name?: string; // Joined field
+    action_type: 'SPIN' | 'SHOP' | 'QUEST' | 'ADMIN' | 'ARCADE' | 'SYSTEM';
+    details: string;
+    timestamp: number;
+}
+
 export type QuestType = 'Daily' | 'Party' | 'Urgent';
 
 export interface Quest {
@@ -89,6 +99,16 @@ export interface Quest {
   reward_xp: number;
   type: QuestType;
   expiresAt: number; // Timestamp
+}
+
+export interface QuestSubmission {
+    user_id: string;
+    user_name: string;
+    quest_id: string;
+    quest_title: string;
+    reward_gold: number;
+    reward_xp: number;
+    status: 'pending' | 'approved';
 }
 
 export interface BossEvent {
@@ -136,7 +156,7 @@ export interface GameSettings {
 export interface GameState {
   user: User | null;
   activeQuests: Quest[];
-  completedQuestIds: string[];
+  userQuestStatuses: Record<string, string>; // questId -> 'pending' | 'approved'
   todayLog?: AttendanceLog;
   isOverdrive: boolean;
   isShiftActive: boolean;
@@ -158,7 +178,12 @@ export interface GameState {
   takeDamage: (amount: number) => void;
   clockIn: (time: Date) => Promise<AttendanceLog>;
   clockOut: (time: Date) => Promise<AttendanceLog>;
-  completeQuest: (questId: string) => void;
+  submitQuest: (questId: string) => void; // User submits
+  approveQuest: (userId: string, questId: string) => Promise<void>; // Admin approves
+  rejectQuest: (userId: string, questId: string) => Promise<void>; // Admin rejects
+  bulkApproveQuests: (submissions: QuestSubmission[]) => Promise<void>;
+  bulkRejectQuests: (submissions: QuestSubmission[]) => Promise<void>;
+  getPendingSubmissions: () => Promise<QuestSubmission[]>;
   toggleOverdrive: () => void;
   buyItem: (itemId: string) => void;
   equipItem: (type: keyof AvatarConfig, assetId: string) => void;
@@ -184,6 +209,7 @@ export interface GameState {
   toggleBan: (userId: string) => Promise<void>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   punishUser: (userId: string, type: 'gold' | 'xp' | 'hp', amount: number) => Promise<void>;
+  getAuditLogs: () => Promise<AuditLog[]>;
   // Settings & Audio
   updateSettings: (newSettings: Partial<GameSettings>) => void;
   resetGameData: () => void;

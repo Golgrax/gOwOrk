@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { CheckCircle, ShieldAlert, Star, RefreshCw, Lock } from 'lucide-react';
+import { CheckCircle, ShieldAlert, Star, RefreshCw, Lock, Clock } from 'lucide-react';
 
 export const QuestBoard: React.FC = () => {
-  const { activeQuests, completeQuest, completedQuestIds, user, nextQuestRefresh, isShiftActive } = useGame();
+  const { activeQuests, submitQuest, userQuestStatuses, user, nextQuestRefresh, isShiftActive } = useGame();
   const [timeLeft, setTimeLeft] = useState('');
 
   useEffect(() => {
@@ -40,7 +40,9 @@ export const QuestBoard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
         {activeQuests.map((quest) => {
-          const isCompleted = completedQuestIds.includes(quest.id);
+          const status = userQuestStatuses[quest.id] || 'active'; // 'active', 'pending', 'approved'
+          const isCompleted = status === 'approved';
+          const isPending = status === 'pending';
           const isUrgent = quest.type === 'Urgent';
 
           return (
@@ -66,20 +68,22 @@ export const QuestBoard: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => completeQuest(quest.id)}
-                  disabled={isCompleted || !isShiftActive}
+                  onClick={() => submitQuest(quest.id)}
+                  disabled={isCompleted || isPending || !isShiftActive}
                   className={`
                     ml-4 px-4 py-2 text-sm font-bold border-2 border-black pixel-shadow flex items-center gap-2
                     ${isCompleted 
                       ? 'bg-gray-400 text-gray-700 cursor-default shadow-none translate-y-1 translate-x-1' 
-                      : !isShiftActive
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-retro-green hover:bg-green-400 text-black active:translate-y-1 active:shadow-none'
+                      : isPending 
+                        ? 'bg-yellow-300 text-yellow-800 cursor-not-allowed'
+                        : !isShiftActive
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-retro-green hover:bg-green-400 text-black active:translate-y-1 active:shadow-none'
                     }
                   `}
                 >
-                  {!isShiftActive && !isCompleted ? <Lock size={14} /> : null}
-                  {isCompleted ? 'DONE' : 'COMPLETE'}
+                  {!isShiftActive && !isCompleted && !isPending ? <Lock size={14} /> : null}
+                  {isCompleted ? 'DONE' : isPending ? <><Clock size={14}/> PENDING</> : 'COMPLETE'}
                 </button>
               </div>
             </RetroCard>

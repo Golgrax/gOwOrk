@@ -189,7 +189,7 @@ const GameLayout: React.FC = () => {
               active={currentView === 'profile'} 
               onClick={() => { setCurrentView('profile'); playSfx('button'); }} 
            />
-           {user.role === 'manager' && (
+           {(user.role === 'manager' || user.role === 'moderator') && (
              <NavButton 
                 icon={<ClipboardList />} 
                 label="Admin" 

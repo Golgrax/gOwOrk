@@ -1,5 +1,5 @@
 
-import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers } from '../types';
+import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission } from '../types';
 import { sqliteService } from './sqliteService';
 
 // --- MOCK CONSTANTS (Static Data) ---
@@ -48,6 +48,27 @@ const INITIAL_BOSS: BossEvent = {
   description: "An endless horde of caffeine-deprived zombies."
 };
 
+// Wheel Prizes Configuration
+export interface WheelPrize {
+    id: string;
+    label: string;
+    type: 'gold' | 'xp' | 'hp';
+    value: number;
+    weight: number; // Higher = more likely
+    color: string;
+}
+
+export const WHEEL_PRIZES: WheelPrize[] = [
+    { id: 'p1', label: '50 Gold', type: 'gold', value: 50, weight: 30, color: '#FFD700' }, // Gold
+    { id: 'p2', label: '50 XP', type: 'xp', value: 50, weight: 30, color: '#3B82F6' },    // Blue
+    { id: 'p3', label: '10 Gold', type: 'gold', value: 10, weight: 10, color: '#EF4444' }, // Red (Bad)
+    { id: 'p4', label: 'Full Heal', type: 'hp', value: 100, weight: 10, color: '#10B981' }, // Green
+    { id: 'p5', label: '100 Gold', type: 'gold', value: 100, weight: 10, color: '#FFD700' }, // Gold
+    { id: 'p6', label: '100 XP', type: 'xp', value: 100, weight: 10, color: '#3B82F6' },    // Blue
+    { id: 'p7', label: '10 XP', type: 'xp', value: 10, weight: 10, color: '#EF4444' },    // Red (Bad)
+    { id: 'p8', label: 'JACKPOT', type: 'gold', value: 500, weight: 1, color: '#A855F7' },  // Purple
+];
+
 class GameService {
   private user: User | null = null;
   private bossEvent: BossEvent = { ...INITIAL_BOSS };
@@ -62,6 +83,31 @@ class GameService {
   private async init() {
       await sqliteService.init();
       this.loadGlobals();
+  }
+
+  // --- LOGGING HELPER ---
+  private logAction(userId: string, type: 'SPIN' | 'SHOP' | 'QUEST' | 'ADMIN' | 'ARCADE' | 'SYSTEM', details: string) {
+      sqliteService.run(
+          `INSERT INTO audit_logs (id, user_id, action_type, details, timestamp) VALUES (?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), userId, type, details, Date.now()]
+      );
+  }
+
+  async getAuditLogs(): Promise<AuditLog[]> {
+      const rows = sqliteService.getAllObjects(`
+          SELECT a.*, u.username as user_name 
+          FROM audit_logs a 
+          LEFT JOIN users u ON a.user_id = u.id 
+          ORDER BY timestamp DESC LIMIT 100
+      `);
+      return rows.map(r => ({
+          id: r.id,
+          user_id: r.user_id,
+          user_name: r.user_name || 'Unknown',
+          action_type: r.action_type,
+          details: r.details,
+          timestamp: r.timestamp
+      }));
   }
 
   // --- AUTHENTICATION (SQLITE) ---
@@ -140,6 +186,8 @@ class GameService {
               JSON.stringify(newUser.avatar_json), JSON.stringify(newUser.inventory), JSON.stringify(newUser.achievements), JSON.stringify(newUser.unlocked_skills), JSON.stringify(newUser.pet || null)
           ]
       );
+      
+      this.logAction(newUser.id, 'SYSTEM', 'User registered');
 
       this.user = newUser;
       return newUser;
@@ -211,7 +259,7 @@ class GameService {
 
   // --- QUESTS (SQLITE) ---
 
-  async getQuests(): Promise<{ active: Quest[], completedIds: string[], nextRefresh: number }> {
+  async getQuests(): Promise<{ active: Quest[], userStatus: Record<string, string>, nextRefresh: number }> {
       await sqliteService.init();
       
       const now = Date.now();
@@ -244,14 +292,16 @@ class GameService {
           expiresAt: r.expires_at
       }));
 
-      let completedIds: string[] = [];
+      const userStatus: Record<string, string> = {};
       if (this.user) {
-          const compRows = sqliteService.getAllObjects(`SELECT quest_id FROM completed_quests WHERE user_id = ?`, [this.user.id]);
-          completedIds = compRows.map(r => r.quest_id);
+          const compRows = sqliteService.getAllObjects(`SELECT quest_id, status FROM completed_quests WHERE user_id = ?`, [this.user.id]);
+          compRows.forEach(r => {
+             userStatus[r.quest_id] = r.status || 'approved'; // Default approved for old schema
+          });
       }
 
       // We just use a static refresh time for UI since DB handles dynamic generation
-      return { active: activeQuests, completedIds, nextRefresh: now + 3600000 };
+      return { active: activeQuests, userStatus, nextRefresh: now + 3600000 };
   }
 
   async createQuest(quest: Omit<Quest, 'id' | 'expiresAt'>, durationHours: number) {
@@ -260,31 +310,99 @@ class GameService {
           `INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [Date.now().toString(), quest.title, quest.description, quest.reward_gold, quest.reward_xp, quest.type, expiresAt]
       );
+      if (this.user) this.logAction(this.user.id, 'ADMIN', `Created quest: ${quest.title}`);
   }
 
-  async completeQuest(questId: string): Promise<{ user: User, reward: number }> {
+  // REPLACED completeQuest with submitQuest
+  async submitQuest(questId: string): Promise<{ user: User, status: string }> {
       if (!this.user) throw new Error("Not logged in");
       
       const qRow = sqliteService.getAsObject(`SELECT * FROM active_quests WHERE id = ?`, [questId]);
       if (!qRow) throw new Error("Quest not found or expired");
 
-      sqliteService.run(`INSERT INTO completed_quests (user_id, quest_id) VALUES (?, ?)`, [this.user.id, questId]);
+      // Mark as pending
+      sqliteService.run(`INSERT OR REPLACE INTO completed_quests (user_id, quest_id, status) VALUES (?, ?, 'pending')`, [this.user.id, questId]);
 
-      // Rewards
-      const xpBoost = this.getSkillMultiplier('xp_boost') * this.globalModifiers.xpMultiplier;
-      const goldBoost = this.getSkillMultiplier('gold_boost') * this.globalModifiers.goldMultiplier;
+      this.logAction(this.user.id, 'QUEST', `Submitted Quest: ${qRow.title} (Pending)`);
 
-      const gold = Math.floor(qRow.reward_gold * goldBoost);
-      const xp = Math.floor(qRow.reward_xp * xpBoost);
-
-      this.user.current_gold += gold;
-      this.user.current_xp += xp;
-      this.damageBoss(50);
-      this.checkLevelUp();
-      this.saveUserToDb();
-
-      return { user: this.user, reward: gold };
+      return { user: this.user, status: 'pending' };
   }
+
+  // --- MANAGER APPROVALS ---
+
+  async getPendingSubmissions(): Promise<QuestSubmission[]> {
+     const rows = sqliteService.getAllObjects(`
+         SELECT c.user_id, u.name as user_name, c.quest_id, q.title as quest_title, q.reward_gold, q.reward_xp
+         FROM completed_quests c
+         JOIN users u ON c.user_id = u.id
+         JOIN active_quests q ON c.quest_id = q.id
+         WHERE c.status = 'pending'
+     `);
+     return rows.map(r => ({
+         user_id: r.user_id,
+         user_name: r.user_name,
+         quest_id: r.quest_id,
+         quest_title: r.quest_title,
+         reward_gold: r.reward_gold,
+         reward_xp: r.reward_xp,
+         status: 'pending'
+     }));
+  }
+
+  async approveQuest(userId: string, questId: string) {
+      const qRow = sqliteService.getAsObject(`SELECT * FROM active_quests WHERE id = ?`, [questId]);
+      if (!qRow) throw new Error("Quest not found");
+
+      // Mark approved
+      sqliteService.run(`UPDATE completed_quests SET status = 'approved' WHERE user_id = ? AND quest_id = ?`, [userId, questId]);
+
+      // Grant Rewards directly to the target user
+      sqliteService.run(
+          `UPDATE users SET current_gold = current_gold + ?, current_xp = current_xp + ? WHERE id = ?`,
+          [qRow.reward_gold, qRow.reward_xp, userId]
+      );
+
+      this.damageBoss(50);
+      
+      // Update local user if it's me
+      if (this.user && this.user.id === userId) {
+          this.user.current_gold += qRow.reward_gold;
+          this.user.current_xp += qRow.reward_xp;
+          this.checkLevelUp();
+      }
+      
+      if(this.user) this.logAction(this.user.id, 'ADMIN', `Approved Quest '${qRow.title}' for user ${userId}`);
+  }
+
+  async rejectQuest(userId: string, questId: string) {
+      // Deleting the row allows them to try again
+      sqliteService.run(`DELETE FROM completed_quests WHERE user_id = ? AND quest_id = ?`, [userId, questId]);
+      
+      if(this.user) this.logAction(this.user.id, 'ADMIN', `Rejected Quest for user ${userId}`);
+  }
+
+  async bulkApproveQuests(submissions: QuestSubmission[]) {
+      for (const sub of submissions) {
+          try {
+              await this.approveQuest(sub.user_id, sub.quest_id);
+          } catch(e) {
+              console.error(`Failed to approve ${sub.quest_id}`, e);
+          }
+      }
+      if(this.user) this.logAction(this.user.id, 'ADMIN', `Bulk Approved ${submissions.length} Quests`);
+  }
+
+  async bulkRejectQuests(submissions: QuestSubmission[]) {
+      for (const sub of submissions) {
+          try {
+              await this.rejectQuest(sub.user_id, sub.quest_id);
+          } catch(e) {
+              console.error(`Failed to reject ${sub.quest_id}`, e);
+          }
+      }
+      if(this.user) this.logAction(this.user.id, 'ADMIN', `Bulk Rejected ${submissions.length} Quests`);
+  }
+
 
   // --- ATTENDANCE (SQLITE) ---
 
@@ -430,6 +548,7 @@ class GameService {
           this.user.inventory.push(itemId);
       }
       this.saveUserToDb();
+      this.logAction(this.user.id, 'SHOP', `Bought ${item.name} for ${cost}G`);
       return { user: this.user, message: `Bought ${item.name}` };
   }
 
@@ -449,6 +568,7 @@ class GameService {
       this.user.last_mystery_box_date = today;
       this.checkLevelUp();
       this.saveUserToDb();
+      this.logAction(this.user.id, 'SHOP', `Mystery Box: ${msg}`);
       return { user: this.user, message: msg };
   }
 
@@ -491,15 +611,36 @@ class GameService {
 
   spinWheel() {
       if (!this.user) throw new Error("No User");
-      // Simplified logic
-      const result = Math.random() > 0.5 ? { type: 'gold', val: 50 } : { type: 'xp', val: 50 };
-      if (result.type === 'gold') this.user.current_gold += result.val;
-      else this.user.current_xp += result.val;
+      
+      // Weighted Random Selection
+      const totalWeight = WHEEL_PRIZES.reduce((sum, p) => sum + p.weight, 0);
+      let r = Math.random() * totalWeight;
+      let selectedPrize = WHEEL_PRIZES[0];
+
+      for (const prize of WHEEL_PRIZES) {
+          if (r < prize.weight) {
+              selectedPrize = prize;
+              break;
+          }
+          r -= prize.weight;
+      }
+
+      if (selectedPrize.type === 'gold') this.user.current_gold += selectedPrize.value;
+      if (selectedPrize.type === 'xp') this.user.current_xp += selectedPrize.value;
+      if (selectedPrize.type === 'hp') this.user.current_hp = this.user.total_hp; // Full heal usually
       
       this.user.last_spin_date = new Date().toISOString().split('T')[0];
       this.checkLevelUp();
       this.saveUserToDb();
-      return { reward: `+${result.val} ${result.type.toUpperCase()}`, value: result.val, type: result.type as any };
+      
+      this.logAction(this.user.id, 'SPIN', `Wheel Prize: ${selectedPrize.label}`);
+
+      return { 
+          reward: `+${selectedPrize.value} ${selectedPrize.type === 'hp' ? 'HP' : (selectedPrize.type === 'gold' ? 'Gold' : 'XP')}`, 
+          value: selectedPrize.value, 
+          type: selectedPrize.type,
+          prizeId: selectedPrize.id 
+      };
   }
 
   canSpin() {
@@ -591,6 +732,7 @@ class GameService {
           `UPDATE users SET current_hp=?, current_gold=?, current_xp=? WHERE id=?`, 
           [user.current_hp, user.current_gold, user.current_xp, uid]
       );
+      if (this.user) this.logAction(this.user.id, 'ADMIN', `Punished user ${uid}: -${amt} ${type}`);
   }
 
   async toggleBan(uid: string) {
@@ -598,12 +740,14 @@ class GameService {
       if (u) {
           const newVal = u.is_banned ? 0 : 1;
           sqliteService.run(`UPDATE users SET is_banned=? WHERE id=?`, [newVal, uid]);
+          if (this.user) this.logAction(this.user.id, 'ADMIN', `Toggled ban for user ${uid}`);
       }
   }
 
   async giveBonus(uid: string, amt: number) {
       sqliteService.run(`UPDATE users SET current_gold = current_gold + ? WHERE id = ?`, [amt, uid]);
       if (this.user && this.user.id === uid) this.user.current_gold += amt;
+      if (this.user) this.logAction(this.user.id, 'ADMIN', `Sent ${amt}G bonus to ${uid}`);
   }
   
   async unlockSkill(sid: string): Promise<User> {
@@ -646,6 +790,7 @@ class GameService {
       if(this.user) {
           this.user.last_arcade_play_time = Date.now();
           this.saveUserToDb();
+          this.logAction(this.user.id, 'ARCADE', 'Played Coffee Rush');
       }
       return this.user!;
   }

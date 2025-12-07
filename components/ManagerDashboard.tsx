@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Clock, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save } from 'lucide-react';
-import { WeatherType, TeamStats, User } from '../types';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Clock, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Filter, Check, X, Inbox, Search, CheckCircle, XCircle } from 'lucide-react';
+import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
+import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, addToast, playSfx } = useGame();
-  const [activeTab, setActiveTab] = useState<'control' | 'team' | 'manage'>('control');
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, bulkApproveQuests, bulkRejectQuests, user } = useGame();
+  const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
   const [title, setTitle] = useState('');
@@ -20,6 +21,14 @@ export const ManagerDashboard: React.FC = () => {
 
   // Team State
   const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+  
+  // Logs State
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [logFilter, setLogFilter] = useState<'ALL' | 'PRIZES' | 'SHOP' | 'ADMIN'>('ALL');
+
+  // Inbox State
+  const [pendingQuests, setPendingQuests] = useState<QuestSubmission[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Manage Modal State
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -29,7 +38,47 @@ export const ManagerDashboard: React.FC = () => {
       if (activeTab === 'team' || activeTab === 'manage') {
           getTeamData().then(setTeamStats);
       }
+      if (activeTab === 'logs') {
+          gameService.getAuditLogs().then(setAuditLogs);
+      }
+      if (activeTab === 'inbox') {
+          refreshInbox();
+      }
   }, [activeTab]);
+
+  const refreshInbox = () => {
+      getPendingSubmissions().then(setPendingQuests);
+  }
+
+  const handleApprove = async (userId: string, questId: string) => {
+      await approveQuest(userId, questId);
+      refreshInbox();
+      playSfx('coin');
+  }
+
+  const handleReject = async (userId: string, questId: string) => {
+      await rejectQuest(userId, questId);
+      refreshInbox();
+  }
+
+  const handleBulkApprove = async () => {
+      const filtered = getFilteredPending();
+      if(filtered.length === 0) return;
+      if(window.confirm(`Approve all ${filtered.length} visible requests?`)) {
+          await bulkApproveQuests(filtered);
+          refreshInbox();
+          playSfx('success');
+      }
+  }
+
+  const handleBulkReject = async () => {
+      const filtered = getFilteredPending();
+      if(filtered.length === 0) return;
+      if(window.confirm(`Reject all ${filtered.length} visible requests?`)) {
+          await bulkRejectQuests(filtered);
+          refreshInbox();
+      }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
      e.preventDefault();
@@ -109,32 +158,131 @@ export const ManagerDashboard: React.FC = () => {
       { type: 'Foggy', icon: <CloudFog size={16} /> },
   ];
 
+  const filteredLogs = auditLogs.filter(log => {
+      if (logFilter === 'ALL') return true;
+      if (logFilter === 'PRIZES') return ['SPIN', 'QUEST', 'ARCADE'].includes(log.action_type);
+      if (logFilter === 'SHOP') return log.action_type === 'SHOP';
+      if (logFilter === 'ADMIN') return ['ADMIN', 'SYSTEM'].includes(log.action_type);
+      return true;
+  });
+
+  const getFilteredPending = () => {
+      if (!searchQuery) return pendingQuests;
+      return pendingQuests.filter(p => p.user_name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }
+
+  const isManager = user?.role === 'manager';
+
   return (
     <div className="pb-20 space-y-6">
        
        {/* Dashboard Tabs */}
        <div className="flex border-4 border-black bg-white flex-wrap">
            <button 
-             onClick={() => setActiveTab('control')}
-             className={`flex-1 min-w-[120px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'control' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+             onClick={() => setActiveTab('inbox')}
+             className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'inbox' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
            >
-               <Zap size={20}/> Controls
+               <Inbox size={20}/> Inbox
+               {pendingQuests.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full">{pendingQuests.length}</span>}
            </button>
+           
+           {/* Only Manager sees Controls */}
+           {isManager && (
+               <button 
+                 onClick={() => setActiveTab('control')}
+                 className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'control' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+               >
+                   <Zap size={20}/> Controls
+               </button>
+           )}
+
            <button 
              onClick={() => setActiveTab('team')}
-             className={`flex-1 min-w-[120px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'team' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+             className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'team' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
            >
                <BarChart3 size={20}/> Analytics
            </button>
            <button 
              onClick={() => setActiveTab('manage')}
-             className={`flex-1 min-w-[120px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'manage' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+             className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'manage' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
            >
-               <Users size={20}/> HR Dept
+               <Users size={20}/> Staff
+           </button>
+           <button 
+             onClick={() => setActiveTab('logs')}
+             className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'logs' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+           >
+               <FileText size={20}/> Logs
            </button>
        </div>
 
-       {activeTab === 'control' && (
+       {activeTab === 'inbox' && (
+           <RetroCard title="Pending Approvals" className="bg-white">
+               {/* Search & Bulk Actions */}
+               <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between items-center">
+                   <div className="relative w-full md:w-auto flex-1">
+                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                       <input 
+                           type="text"
+                           placeholder="Search users..."
+                           className="w-full border-2 border-black pl-10 pr-4 py-2 font-bold"
+                           value={searchQuery}
+                           onChange={(e) => setSearchQuery(e.target.value)}
+                       />
+                   </div>
+                   {getFilteredPending().length > 0 && (
+                       <div className="flex gap-2 w-full md:w-auto">
+                           <button 
+                               onClick={handleBulkApprove}
+                               className="flex-1 px-4 py-2 bg-green-100 text-green-800 border-2 border-green-600 font-bold uppercase text-xs flex items-center justify-center gap-1 hover:bg-green-200"
+                           >
+                               <CheckCircle size={14} /> Approve All ({getFilteredPending().length})
+                           </button>
+                           <button 
+                               onClick={handleBulkReject}
+                               className="flex-1 px-4 py-2 bg-red-100 text-red-800 border-2 border-red-600 font-bold uppercase text-xs flex items-center justify-center gap-1 hover:bg-red-200"
+                           >
+                               <XCircle size={14} /> Reject All
+                           </button>
+                       </div>
+                   )}
+               </div>
+
+               {getFilteredPending().length === 0 ? (
+                   <div className="text-center py-8 text-gray-500 italic">No pending quests found.</div>
+               ) : (
+                   <div className="space-y-3">
+                       {getFilteredPending().map((p, i) => (
+                           <div key={`${p.user_id}-${p.quest_id}`} className="bg-yellow-50 border-2 border-black p-3 flex justify-between items-center">
+                               <div>
+                                   <div className="font-bold">{p.user_name}</div>
+                                   <div className="text-sm text-gray-600">Completed: {p.quest_title}</div>
+                                   <div className="text-xs text-retro-goldDark font-bold mt-1">Reward: {p.reward_gold}G / {p.reward_xp}XP</div>
+                               </div>
+                               <div className="flex gap-2">
+                                   <button 
+                                      onClick={() => handleReject(p.user_id, p.quest_id)}
+                                      className="p-2 border-2 border-black bg-white hover:bg-red-100 text-red-600 font-bold"
+                                      title="Reject"
+                                   >
+                                       <X size={16} />
+                                   </button>
+                                   <button 
+                                      onClick={() => handleApprove(p.user_id, p.quest_id)}
+                                      className="p-2 border-2 border-black bg-green-500 hover:bg-green-400 text-white font-bold flex items-center gap-1"
+                                      title="Approve"
+                                   >
+                                       <Check size={16} /> Approve
+                                   </button>
+                               </div>
+                           </div>
+                       ))}
+                   </div>
+               )}
+           </RetroCard>
+       )}
+
+       {activeTab === 'control' && isManager && (
            <>
                <RetroCard title="Company Events (Buffs)" className="bg-purple-100 border-purple-900">
                     <div className="flex flex-col md:flex-row gap-4">
@@ -155,8 +303,6 @@ export const ManagerDashboard: React.FC = () => {
                     </div>
                </RetroCard>
                
-               {/* Corporate Actions section removed */}
-
                <RetroCard title="Environment Settings" className="bg-gray-100">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                        <div className="space-y-4">
@@ -377,27 +523,31 @@ export const ManagerDashboard: React.FC = () => {
                                                >
                                                    <UserCog size={16} />
                                                </button>
-                                               <button 
-                                                 onClick={() => handleGiveBonus(u.id)}
-                                                 className="p-2 border-2 border-black bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
-                                                 title="Give Bonus"
-                                               >
-                                                   <Gift size={16} />
-                                               </button>
-                                               <button 
-                                                  onClick={() => setPunishMode({userId: u.id, type: 'hp', amount: 10})}
-                                                  className="p-2 border-2 border-black bg-red-100 hover:bg-red-200 text-red-800"
-                                                  title="Punish (Smite)"
-                                               >
-                                                   <Gavel size={16} />
-                                               </button>
-                                               <button 
-                                                  onClick={() => handleToggleBan(u.id)}
-                                                  className="p-2 border-2 border-black bg-gray-800 text-white hover:bg-black"
-                                                  title={u.isBanned ? "Unban User" : "Ban User"}
-                                               >
-                                                   <Ban size={16} />
-                                               </button>
+                                               {isManager && (
+                                                   <>
+                                                       <button 
+                                                         onClick={() => handleGiveBonus(u.id)}
+                                                         className="p-2 border-2 border-black bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+                                                         title="Give Bonus"
+                                                       >
+                                                           <Gift size={16} />
+                                                       </button>
+                                                       <button 
+                                                          onClick={() => setPunishMode({userId: u.id, type: 'hp', amount: 10})}
+                                                          className="p-2 border-2 border-black bg-red-100 hover:bg-red-200 text-red-800"
+                                                          title="Punish (Smite)"
+                                                       >
+                                                           <Gavel size={16} />
+                                                       </button>
+                                                       <button 
+                                                          onClick={() => handleToggleBan(u.id)}
+                                                          className="p-2 border-2 border-black bg-gray-800 text-white hover:bg-black"
+                                                          title={u.isBanned ? "Unban User" : "Ban User"}
+                                                       >
+                                                           <Ban size={16} />
+                                                       </button>
+                                                   </>
+                                               )}
                                            </div>
                                        </td>
                                    </tr>
@@ -407,6 +557,65 @@ export const ManagerDashboard: React.FC = () => {
                    </div>
                </RetroCard>
            </div>
+       )}
+
+       {activeTab === 'logs' && (
+           <RetroCard title="Activity Audit Logs" className="bg-white">
+               {/* Log Filters */}
+               <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                   {['ALL', 'PRIZES', 'SHOP', 'ADMIN'].map((filter) => (
+                       <button
+                           key={filter}
+                           onClick={() => setLogFilter(filter as any)}
+                           className={`px-3 py-1 border-2 border-black text-xs font-bold uppercase flex items-center gap-1 ${
+                               logFilter === filter ? 'bg-black text-white' : 'bg-gray-100 hover:bg-gray-200'
+                           }`}
+                       >
+                           {filter === 'ALL' && <FileText size={12} />}
+                           {filter === 'PRIZES' && <Gift size={12} />}
+                           {filter === 'SHOP' && <Download size={12} className="rotate-180" />}
+                           {filter === 'ADMIN' && <Gavel size={12} />}
+                           {filter}
+                       </button>
+                   ))}
+               </div>
+
+               <div className="overflow-x-auto">
+                   <table className="w-full text-left text-sm">
+                       <thead>
+                           <tr className="border-b-4 border-black bg-gray-100">
+                               <th className="p-2 font-bold uppercase">Time</th>
+                               <th className="p-2 font-bold uppercase">User</th>
+                               <th className="p-2 font-bold uppercase">Action</th>
+                               <th className="p-2 font-bold uppercase">Details</th>
+                           </tr>
+                       </thead>
+                       <tbody>
+                           {filteredLogs.length > 0 ? filteredLogs.map(log => (
+                               <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50 font-mono">
+                                   <td className="p-2 text-gray-600 whitespace-nowrap">
+                                       {new Date(log.timestamp).toLocaleTimeString()}
+                                   </td>
+                                   <td className="p-2 font-bold">{log.user_name}</td>
+                                   <td className="p-2">
+                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                           log.action_type === 'ADMIN' ? 'bg-red-100 text-red-600' :
+                                           log.action_type === 'SPIN' ? 'bg-purple-100 text-purple-600' :
+                                           log.action_type === 'SHOP' ? 'bg-yellow-100 text-yellow-700' :
+                                           'bg-blue-100 text-blue-600'
+                                       }`}>
+                                           {log.action_type}
+                                       </span>
+                                   </td>
+                                   <td className="p-2 text-gray-800">{log.details}</td>
+                               </tr>
+                           )) : (
+                               <tr><td colSpan={4} className="p-4 text-center text-gray-500">No logs found for this filter.</td></tr>
+                           )}
+                       </tbody>
+                   </table>
+               </div>
+           </RetroCard>
        )}
 
        {/* Edit User Modal */}
@@ -431,6 +640,7 @@ export const ManagerDashboard: React.FC = () => {
                              onChange={e => setEditingUser({...editingUser, role: e.target.value as any})}
                            >
                                <option value="employee">Employee</option>
+                               <option value="moderator">Moderator</option>
                                <option value="manager">Manager</option>
                            </select>
                        </div>

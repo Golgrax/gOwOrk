@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings } from '../types';
+import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 import { audioService } from '../services/audioService';
 import confetti from 'canvas-confetti';
@@ -21,7 +21,7 @@ export const useGame = () => {
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [activeQuests, setActiveQuests] = useState<Quest[]>([]);
-  const [completedQuestIds, setCompletedQuestIds] = useState<string[]>([]);
+  const [userQuestStatuses, setUserQuestStatuses] = useState<Record<string, string>>({});
   const [todayLog, setTodayLog] = useState<AttendanceLog | undefined>(undefined);
   const [isOverdrive, setIsOverdrive] = useState(false);
   const [leaderboard, setLeaderboard] = useState<User[]>([]);
@@ -94,7 +94,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const q = await gameService.getQuests();
       const l = await gameService.getLeaderboard();
       setActiveQuests(q.active);
-      setCompletedQuestIds(q.completedIds);
+      setUserQuestStatuses(q.userStatus);
       setNextQuestRefresh(q.nextRefresh);
       setLeaderboard(l);
       setBossEvent(gameService.getBossEvent());
@@ -193,19 +193,43 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return log;
   };
 
-  const completeQuest = async (questId: string) => {
+  const submitQuest = async (questId: string) => {
     try {
-      const { user: updatedUser, reward } = await gameService.completeQuest(questId);
-      setUser(updatedUser);
-      setCompletedQuestIds(prev => [...prev, questId]);
-      setBossEvent(gameService.getBossEvent()); 
-      addToast(`Quest Complete! +${reward} Gold`, 'success');
-      playSfx('coin');
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#FFD700', '#FFA500'] });
+      await gameService.submitQuest(questId);
+      refreshGameData(); // To update status to pending
+      addToast('Quest Submitted for Approval', 'info');
+      playSfx('button');
     } catch (e: any) {
       addToast(e.message, 'error');
     }
   };
+
+  // Replaced direct completion with submit
+  const completeQuest = submitQuest;
+
+  const approveQuest = async (userId: string, questId: string) => {
+      await gameService.approveQuest(userId, questId);
+      addToast('Quest Approved', 'success');
+  }
+
+  const rejectQuest = async (userId: string, questId: string) => {
+      await gameService.rejectQuest(userId, questId);
+      addToast('Quest Rejected', 'info');
+  }
+
+  const bulkApproveQuests = async (submissions: QuestSubmission[]) => {
+      await gameService.bulkApproveQuests(submissions);
+      addToast(`Approved ${submissions.length} requests`, 'success');
+  }
+
+  const bulkRejectQuests = async (submissions: QuestSubmission[]) => {
+      await gameService.bulkRejectQuests(submissions);
+      addToast(`Rejected ${submissions.length} requests`, 'info');
+  }
+
+  const getPendingSubmissions = async () => {
+      return await gameService.getPendingSubmissions();
+  }
 
   const buyItem = async (itemId: string) => {
       try {
@@ -338,7 +362,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <GameContext.Provider value={{
       user,
       activeQuests,
-      completedQuestIds,
+      userQuestStatuses,
+      completedQuestIds: [], // Deprecated in favor of userQuestStatuses, kept for TS compat if needed but unused in new logic
       todayLog,
       isOverdrive,
       isShiftActive,
@@ -359,7 +384,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       takeDamage,
       clockIn,
       clockOut,
-      completeQuest,
+      submitQuest,
+      approveQuest,
+      rejectQuest,
+      bulkApproveQuests,
+      bulkRejectQuests,
+      getPendingSubmissions,
       toggleOverdrive,
       buyItem,
       equipItem,
