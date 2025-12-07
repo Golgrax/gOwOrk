@@ -348,6 +348,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
      addToast(`Penalty Applied (-${amount} ${type.toUpperCase()})`, 'error');
      playSfx('error');
   }
+  const getAuditLogs = async () => { return await gameService.getAuditLogs(); }
 
   return (
     <GameContext.Provider value={{
@@ -402,6 +403,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toggleBan,
       updateUser,
       punishUser,
+      getAuditLogs,
       updateSettings,
       resetGameData,
       playSfx
