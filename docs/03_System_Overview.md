@@ -27,21 +27,22 @@ The Use Case Diagram visually defines the **functional requirements** and **scop
 *   **Manager Use Cases:** Login, Manage Staff (Ban/Edit), View Analytics, Create Quests, Export Payroll CSV.
 
 ```mermaid
-usecaseDiagram
-    actor "Employee" as E
-    actor "Manager" as M
+flowchart LR
+    E["Employee"]
+    M["Manager"]
 
-    package System {
-        usecase "Login / Authentication" as UC1
-        usecase "Clock In/Out" as UC2
-        usecase "Perform Work Action" as UC3
-        usecase "Purchase Items & Customize" as UC4
-        usecase "Play Minigame (Arcade)" as UC5
-        usecase "Manage Staff (Ban/Edit)" as UC6
-        usecase "View Analytics" as UC7
-        usecase "Create Quests" as UC8
-        usecase "Export Payroll CSV" as UC9
-    }
+    subgraph System
+        direction TB
+        UC1([Login / Authentication])
+        UC2([Clock In/Out])
+        UC3([Perform Work Action])
+        UC4([Purchase Items & Customize])
+        UC5([Play Minigame (Arcade)])
+        UC6([Manage Staff (Ban/Edit)])
+        UC7([View Analytics])
+        UC8([Create Quests])
+        UC9([Export Payroll CSV])
+    end
 
     E --> UC1
     E --> UC2
