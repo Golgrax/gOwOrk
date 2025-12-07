@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import { GameScene } from './components/GameScene';
@@ -160,7 +161,8 @@ const GameLayout: React.FC = () => {
         <ToastContainer />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide pointer-events-auto">
-           <div className="max-w-2xl mx-auto pb-24">
+           {/* Width Logic Update: If Security View, use near full-width. Else use standard max-w-2xl */}
+           <div className={`${currentView === 'security' ? 'w-full max-w-[98vw]' : 'max-w-2xl'} mx-auto pb-24 transition-all duration-300`}>
               {renderView()}
            </div>
         </main>

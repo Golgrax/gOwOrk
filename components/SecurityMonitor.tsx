@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Mic, Activity, RefreshCw, Power, AlertTriangle, Volume2, VolumeX, Maximize2, Minimize2, Monitor, Plus, X as XIcon } from 'lucide-react';
 
@@ -236,43 +237,43 @@ export const SecurityMonitor: React.FC = () => {
     const activeAudios = activeStreams.filter(s => s.type === 'audio');
 
     return (
-        <div className="space-y-6 pb-24">
+        <div className="space-y-6 pb-24 w-full h-full flex flex-col">
             {/* Header / Control Panel */}
-            <div className="bg-white border-4 border-black p-4 pixel-shadow">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b-4 border-black pb-2 gap-4">
-                    <h2 className="text-2xl font-bold uppercase flex items-center gap-2">
-                        <Activity size={28} className="text-retro-gold" /> Security Hub
+            <div className="bg-white border-4 border-black p-4 pixel-shadow shrink-0">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b-4 border-black pb-4 gap-4">
+                    <h2 className="text-4xl font-bold uppercase flex items-center gap-2">
+                        <Activity size={36} className="text-retro-gold" /> Security Hub
                     </h2>
-                    <div className="flex flex-wrap gap-2 justify-end">
+                    <div className="flex flex-wrap gap-4 justify-end">
                          <button 
                             onClick={addScreenSource} 
-                            className="flex items-center gap-2 text-sm bg-blue-600 text-white px-4 py-2 hover:bg-blue-500 border-2 border-black font-bold pixel-shadow active:translate-y-1 active:shadow-none transition-all"
+                            className="flex items-center gap-2 text-lg bg-blue-600 text-white px-6 py-3 hover:bg-blue-500 border-2 border-black font-bold pixel-shadow active:translate-y-1 active:shadow-none transition-all"
                         >
-                            <Monitor size={16} /> <Plus size={12} /> WIN/SCR
+                            <Monitor size={24} /> <Plus size={16} /> WIN/SCR
                         </button>
                         <button 
                             onClick={refreshDevices} 
-                            className="flex items-center gap-2 text-sm bg-retro-gold text-black px-4 py-2 hover:bg-yellow-400 border-2 border-black font-bold pixel-shadow active:translate-y-1 active:shadow-none transition-all"
+                            className="flex items-center gap-2 text-lg bg-retro-gold text-black px-6 py-3 hover:bg-yellow-400 border-2 border-black font-bold pixel-shadow active:translate-y-1 active:shadow-none transition-all"
                         >
-                            <RefreshCw size={16} /> RESCAN
+                            <RefreshCw size={24} /> RESCAN
                         </button>
                     </div>
                 </div>
 
                 {error && (
-                    <div className="bg-red-100 border-2 border-black text-red-800 p-2 mb-4 text-sm font-bold flex items-center gap-2">
-                        <AlertTriangle size={18} /> SYSTEM ERROR: {error}
+                    <div className="bg-red-100 border-2 border-black text-red-800 p-2 mb-4 text-lg font-bold flex items-center gap-2">
+                        <AlertTriangle size={24} /> SYSTEM ERROR: {error}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Video Inputs List */}
-                    <div className="bg-gray-50 border-2 border-black p-3">
-                        <h3 className="text-sm font-bold uppercase mb-2 flex items-center gap-2 text-gray-700 border-b-2 border-gray-200 pb-1">
-                            <Camera size={16} /> Video Inputs
+                    <div className="bg-gray-50 border-2 border-black p-4">
+                        <h3 className="text-xl font-bold uppercase mb-3 flex items-center gap-2 text-gray-700 border-b-2 border-gray-200 pb-2">
+                            <Camera size={24} /> Video Inputs
                         </h3>
-                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                            {videoInputs.length === 0 && <div className="text-gray-500 text-sm italic p-2">No Video Sources.</div>}
+                        <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                            {videoInputs.length === 0 && <div className="text-gray-500 text-lg italic p-2">No Video Sources.</div>}
                             {videoInputs.map((item, idx) => {
                                 const isPhysical = item.type === 'physical';
                                 const id = isPhysical ? (item.data as MediaDeviceInfo).deviceId : (item.data as CustomSource).id;
@@ -280,24 +281,24 @@ export const SecurityMonitor: React.FC = () => {
                                 const isChecked = selectedIds.has(id);
 
                                 return (
-                                    <div key={id} className="flex items-center gap-2 hover:bg-yellow-100 p-2 rounded group border border-transparent hover:border-black/10 transition-colors">
+                                    <div key={id} className="flex items-center gap-3 hover:bg-yellow-100 p-2 rounded group border border-transparent hover:border-black/10 transition-colors">
                                         <label className="flex-1 flex items-center gap-3 cursor-pointer">
                                             <input 
                                                 type="checkbox" 
                                                 checked={isChecked}
                                                 onChange={() => isPhysical ? togglePhysicalDevice(item.data as MediaDeviceInfo) : toggleCustomSource(item.data as CustomSource)}
-                                                className="accent-black h-5 w-5"
+                                                className="accent-black h-6 w-6"
                                             />
-                                            <span className="text-sm truncate text-black font-bold">{label}</span>
-                                            {isChecked && <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 ml-auto border border-black rounded-sm">LIVE</span>}
+                                            <span className="text-lg truncate text-black font-bold">{label}</span>
+                                            {isChecked && <span className="text-xs bg-red-600 text-white px-2 py-1 ml-auto border border-black rounded-sm font-bold">LIVE</span>}
                                         </label>
                                         {!isPhysical && (
                                             <button 
                                                 onClick={() => removeCustomSource(id)}
-                                                className="text-gray-400 hover:text-red-600 p-1"
+                                                className="text-gray-400 hover:text-red-600 p-2"
                                                 title="Forget Source"
                                             >
-                                                <XIcon size={16} />
+                                                <XIcon size={20} />
                                             </button>
                                         )}
                                     </div>
@@ -307,12 +308,12 @@ export const SecurityMonitor: React.FC = () => {
                     </div>
 
                     {/* Audio Inputs List */}
-                    <div className="bg-gray-50 border-2 border-black p-3">
-                        <h3 className="text-sm font-bold uppercase mb-2 flex items-center gap-2 text-gray-700 border-b-2 border-gray-200 pb-1">
-                            <Mic size={16} /> Audio Inputs
+                    <div className="bg-gray-50 border-2 border-black p-4">
+                        <h3 className="text-xl font-bold uppercase mb-3 flex items-center gap-2 text-gray-700 border-b-2 border-gray-200 pb-2">
+                            <Mic size={24} /> Audio Inputs
                         </h3>
-                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                            {audioInputs.length === 0 && <div className="text-gray-500 text-sm italic p-2">No Audio Sources.</div>}
+                        <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                            {audioInputs.length === 0 && <div className="text-gray-500 text-lg italic p-2">No Audio Sources.</div>}
                             {audioInputs.map((item, idx) => {
                                 const isPhysical = item.type === 'physical';
                                 const id = isPhysical ? (item.data as MediaDeviceInfo).deviceId : (item.data as CustomSource).id;
@@ -320,24 +321,24 @@ export const SecurityMonitor: React.FC = () => {
                                 const isChecked = selectedIds.has(id);
 
                                 return (
-                                    <div key={id} className="flex items-center gap-2 hover:bg-yellow-100 p-2 rounded group border border-transparent hover:border-black/10 transition-colors">
+                                    <div key={id} className="flex items-center gap-3 hover:bg-yellow-100 p-2 rounded group border border-transparent hover:border-black/10 transition-colors">
                                         <label className="flex-1 flex items-center gap-3 cursor-pointer">
                                             <input 
                                                 type="checkbox" 
                                                 checked={isChecked}
                                                 onChange={() => isPhysical ? togglePhysicalDevice(item.data as MediaDeviceInfo) : toggleCustomSource(item.data as CustomSource)}
-                                                className="accent-black h-5 w-5"
+                                                className="accent-black h-6 w-6"
                                             />
-                                            <span className="text-sm truncate text-black font-bold">{label}</span>
-                                            {isChecked && <Activity size={16} className="text-green-600 ml-auto" />}
+                                            <span className="text-lg truncate text-black font-bold">{label}</span>
+                                            {isChecked && <Activity size={20} className="text-green-600 ml-auto" />}
                                         </label>
                                         {!isPhysical && (
                                             <button 
                                                 onClick={() => removeCustomSource(id)}
-                                                className="text-gray-400 hover:text-red-600 p-1"
+                                                className="text-gray-400 hover:text-red-600 p-2"
                                                 title="Forget Source"
                                             >
-                                                <XIcon size={16} />
+                                                <XIcon size={20} />
                                             </button>
                                         )}
                                     </div>
@@ -348,12 +349,12 @@ export const SecurityMonitor: React.FC = () => {
                 </div>
             </div>
 
-            {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Grid - Adjusted for Larger View */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full flex-1">
                 {activeStreams.length === 0 && (
-                    <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-gray-200 border-4 border-black h-64 flex flex-col items-center justify-center text-gray-500 font-bold pixel-shadow">
-                        <Power size={64} className="mb-4 opacity-50" />
-                        <span className="animate-pulse text-lg">AWAITING SIGNAL...</span>
+                    <div className="col-span-1 lg:col-span-2 bg-gray-200 border-4 border-black min-h-[500px] h-full flex flex-col items-center justify-center text-gray-500 font-bold pixel-shadow">
+                        <Power size={128} className="mb-8 opacity-50" />
+                        <span className="animate-pulse text-4xl tracking-widest">AWAITING SIGNAL...</span>
                     </div>
                 )}
                 {activeVideos.map(feed => (
@@ -382,21 +383,21 @@ const VideoFeed: React.FC<{ stream: MediaStream, label: string }> = ({ stream, l
         <div 
             className={`
                 bg-black border-4 border-black pixel-shadow group transition-all duration-300 flex flex-col
-                ${isZoomed ? 'fixed inset-0 z-50 bg-black/95 h-screen w-screen' : 'relative aspect-video'}
+                ${isZoomed ? 'fixed inset-0 z-50 bg-black/95 h-screen w-screen' : 'relative w-full aspect-video min-h-[400px]'}
             `}
         >
             <div className={`
-                bg-white text-black p-2 flex justify-between items-center border-b-2 border-black shrink-0
+                bg-white text-black p-3 flex justify-between items-center border-b-2 border-black shrink-0
             `}>
-                <span className="text-xs font-bold uppercase truncate max-w-[80%] px-1 flex items-center gap-2">
-                    <Camera size={14} /> {label}
+                <span className="text-lg font-bold uppercase truncate max-w-[80%] px-1 flex items-center gap-2">
+                    <Camera size={20} /> {label}
                 </span>
                 <button 
                     onClick={() => setIsZoomed(!isZoomed)}
-                    className="bg-gray-200 text-black p-1.5 hover:bg-white border-2 border-black rounded-sm"
+                    className="bg-gray-200 text-black p-2 hover:bg-white border-2 border-black rounded-sm"
                     title={isZoomed ? "Exit Fullscreen" : "Fullscreen"}
                 >
-                    {isZoomed ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    {isZoomed ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
                 </button>
             </div>
             <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
@@ -475,25 +476,25 @@ const AudioVisualizer: React.FC<{ stream: MediaStream, label: string }> = ({ str
     }, [isAudible]);
 
     return (
-        <div className="relative bg-black border-4 border-black pixel-shadow h-32 flex flex-col group">
-            <div className="bg-white p-2 flex justify-between items-center border-b-2 border-black">
-                <span className="text-xs text-black font-bold uppercase flex items-center gap-2 truncate max-w-[70%]">
-                    {label.includes('WIN:') ? <Monitor size={14} /> : <Mic size={14} />} {label}
+        <div className="relative bg-black border-4 border-black pixel-shadow min-h-[300px] flex flex-col group w-full">
+            <div className="bg-white p-3 flex justify-between items-center border-b-2 border-black">
+                <span className="text-lg text-black font-bold uppercase flex items-center gap-2 truncate max-w-[70%]">
+                    {label.includes('WIN:') ? <Monitor size={20} /> : <Mic size={20} />} {label}
                 </span>
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={() => setIsAudible(!isAudible)}
-                        className={`p-1.5 rounded ${isAudible ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:text-black'}`}
+                        className={`p-2 rounded ${isAudible ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:text-black'}`}
                         title={isAudible ? "Mute" : "Listen"}
                     >
-                        {isAudible ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                        {isAudible ? <Volume2 size={24} /> : <VolumeX size={24} />}
                     </button>
-                    <Activity size={16} className="text-green-500 animate-pulse" />
+                    <Activity size={24} className="text-green-500 animate-pulse" />
                 </div>
             </div>
-            <canvas ref={canvasRef} width={300} height={100} className="w-full h-full" />
+            <canvas ref={canvasRef} width={600} height={200} className="w-full h-full" />
             {isAudible && (
-                 <div className="absolute bottom-2 right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 font-bold animate-pulse pointer-events-none border border-black">LISTENING</div>
+                 <div className="absolute bottom-2 right-2 bg-red-600 text-white text-sm px-3 py-1 font-bold animate-pulse pointer-events-none border border-black">LISTENING</div>
             )}
         </div>
     );
