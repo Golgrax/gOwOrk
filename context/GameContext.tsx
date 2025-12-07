@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
@@ -75,12 +74,21 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     init();
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
         setBossEvent({...gameService.getBossEvent()});
+        
+        // Auto-refresh user profile to catch Admin updates (Bonuses, etc.)
+        // getUserProfile reads from SQLite, which is the source of truth
+        if (user) {
+            const freshUser = await gameService.getUserProfile();
+            if (freshUser) {
+                setUser(freshUser);
+            }
+        }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]); // Dependency on user ID to restart interval if user switches
 
   useEffect(() => {
       audioService.setVolumes(settings.musicVolume, settings.sfxVolume, settings.isMusicMuted, settings.isSfxMuted);

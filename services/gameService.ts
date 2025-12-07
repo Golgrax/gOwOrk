@@ -199,7 +199,7 @@ class GameService {
 
   async getUserProfile(): Promise<User | null> {
     if (!this.user) return null;
-    // Refresh from DB
+    // Refresh from DB - Crucial for sync
     const row = sqliteService.getAsObject(`SELECT * FROM users WHERE id = ?`, [this.user.id]);
     if (row) {
         this.user = this.mapRowToUser(row);
@@ -607,7 +607,7 @@ class GameService {
       return { 
           reward: `+${selectedPrize.value} ${selectedPrize.type === 'hp' ? 'HP' : (selectedPrize.type === 'gold' ? 'Gold' : 'XP')}`, 
           value: selectedPrize.value, 
-          type: selectedPrize.type,
+          type: selectedPrize.type, 
           prizeId: selectedPrize.id 
       };
   }
@@ -667,7 +667,8 @@ class GameService {
           this.user.level++;
           this.user.skill_points++;
           this.user.total_hp += 10;
-          this.user.current_hp = this.user.total_hp;
+          // IMPORTANT: Removed logic that resets current_hp to total_hp on level up.
+          // User now keeps current damage, only the max cap increases.
       }
   }
 
@@ -715,6 +716,7 @@ class GameService {
 
   async giveBonus(uid: string, amt: number) {
       sqliteService.run(`UPDATE users SET current_gold = current_gold + ? WHERE id = ?`, [amt, uid]);
+      // If giving to self, simple update; otherwise relying on getUserProfile sync
       if (this.user && this.user.id === uid) this.user.current_gold += amt;
       if (this.user) this.logAction(this.user.id, 'ADMIN', `Sent ${amt}G bonus to ${uid}`);
   }
