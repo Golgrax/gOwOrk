@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 // Extend GameState to support password in login
 interface ExtendedGameState extends Omit<GameState, 'login'> {
     login: (username: string, password?: string) => Promise<void>;
+    getSqliteStats: () => { size: number };
 }
 
 const GameContext = createContext<ExtendedGameState | undefined>(undefined);
@@ -59,15 +60,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setMotdState(gameService.getMotd());
           setGlobalModifiers(gameService.getGlobalModifiers());
 
-          // Load Settings
-          const savedSettings = localStorage.getItem('gowork_settings');
-          if (savedSettings) {
-              const parsed = JSON.parse(savedSettings);
-              setSettings(parsed);
-              audioService.setVolumes(parsed.musicVolume, parsed.sfxVolume, parsed.isMusicMuted, parsed.isSfxMuted);
-          } else {
-              audioService.setVolumes(0.5, 0.8, true, false);
-          }
+          // Load Settings from DB (loaded into gameService during init)
+          const dbSettings = gameService.getSettings();
+          setSettings(dbSettings);
+          audioService.setVolumes(dbSettings.musicVolume, dbSettings.sfxVolume, dbSettings.isMusicMuted, dbSettings.isSfxMuted);
+
       } catch (e) {
           console.error("Init failed", e);
       }
@@ -112,7 +109,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateSettings = (newSettings: Partial<GameSettings>) => {
       setSettings(prev => {
           const updated = { ...prev, ...newSettings };
-          localStorage.setItem('gowork_settings', JSON.stringify(updated));
+          gameService.saveSettings(updated); // Persist to SQLite
           return updated;
       });
   }
@@ -358,6 +355,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
   const getAuditLogs = async () => { return await gameService.getAuditLogs(); }
 
+  const getSqliteStats = () => gameService.getSqliteStats();
+
   return (
     <GameContext.Provider value={{
       user,
@@ -414,7 +413,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getAuditLogs,
       updateSettings,
       resetGameData,
-      playSfx
+      playSfx,
+      getSqliteStats
     }}>
       {children}
     </GameContext.Provider>

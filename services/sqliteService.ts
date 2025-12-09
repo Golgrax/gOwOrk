@@ -11,8 +11,9 @@ class SqliteService {
 
     this.initPromise = new Promise(async (resolve, reject) => {
       try {
-        // Manually fetch WASM to avoid environment detection issues (e.g. unenv polyfilling fs)
-        const wasmUrl = 'https://sql.js.org/dist/sql-wasm.wasm';
+        console.log("[SQLite] Initializing WASM Engine...");
+        // Use unpkg to ensure we get the WASM matching the JS version (1.13.0)
+        const wasmUrl = 'https://unpkg.com/sql.js@1.13.0/dist/sql-wasm.wasm';
         const wasmResponse = await fetch(wasmUrl);
         if (!wasmResponse.ok) throw new Error(`Failed to load WASM: ${wasmResponse.statusText}`);
         const wasmBinary = await wasmResponse.arrayBuffer();
@@ -23,15 +24,18 @@ class SqliteService {
 
         const savedDb = localStorage.getItem('gowork_sqlite_db');
         if (savedDb) {
+           console.log("[SQLite] Loading existing database from LocalStorage persistence.");
            const binary = this.base64ToUint8Array(savedDb);
            this.db = new SQL.Database(binary);
         } else {
+           console.log("[SQLite] Creating new in-memory SQLite database.");
            this.db = new SQL.Database();
         }
         
         // Always run migrations to ensure new tables exist
         this.runMigrations();
         
+        console.log("[SQLite] Ready.");
         resolve();
       } catch (e) {
         console.error("Failed to init SQLite", e);
@@ -162,6 +166,7 @@ class SqliteService {
 
   run(sql: string, params?: any[]) {
       if (!this.db) throw new Error("DB not initialized");
+      // console.log(`[SQL Run] ${sql}`, params); // Uncomment for verbose debug
       this.db.run(sql, params);
       if (this.autoSaveEnabled) {
           this.save();
@@ -202,6 +207,15 @@ class SqliteService {
       } catch (e) {
           console.error("Failed to save DB to local storage", e);
       }
+  }
+
+  getDbSize(): number {
+      if (!this.db) return 0;
+      try {
+          // Export is expensive, so this is just for stats
+          const data = this.db.export();
+          return data.byteLength;
+      } catch(e) { return 0; }
   }
 
   // Utils for persistence

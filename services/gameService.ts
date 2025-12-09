@@ -1,5 +1,5 @@
 
-import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission } from '../types';
+import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings } from '../types';
 import { sqliteService } from './sqliteService';
 
 // --- MOCK CONSTANTS (Static Data) ---
@@ -75,6 +75,7 @@ class GameService {
   private weather: WeatherType = 'Sunny';
   private motd: string = "Welcome to gOwOrk! Login to start.";
   private globalModifiers: GlobalModifiers = { xpMultiplier: 1, goldMultiplier: 1 };
+  private settings: GameSettings = { musicVolume: 0.5, sfxVolume: 0.8, isMusicMuted: true, isSfxMuted: false, lowPerformanceMode: false };
 
   constructor() {
     this.init();
@@ -630,6 +631,9 @@ class GameService {
       
       const b = sqliteService.getAsObject(`SELECT value FROM game_globals WHERE key = 'boss'`);
       if (b) this.bossEvent = JSON.parse(b.value);
+
+      const s = sqliteService.getAsObject(`SELECT value FROM game_globals WHERE key = 'settings'`);
+      if (s) this.settings = JSON.parse(s.value);
   }
 
   private saveGlobals() {
@@ -637,6 +641,7 @@ class GameService {
       sqliteService.run(`INSERT OR REPLACE INTO game_globals (key, value) VALUES ('motd', ?)`, [this.motd]);
       sqliteService.run(`INSERT OR REPLACE INTO game_globals (key, value) VALUES ('weather', ?)`, [this.weather]);
       sqliteService.run(`INSERT OR REPLACE INTO game_globals (key, value) VALUES ('boss', ?)`, [JSON.stringify(this.bossEvent)]);
+      sqliteService.run(`INSERT OR REPLACE INTO game_globals (key, value) VALUES ('settings', ?)`, [JSON.stringify(this.settings)]);
   }
 
   // --- SETTERS ---
@@ -650,6 +655,13 @@ class GameService {
       return this.globalModifiers;
   }
   
+  saveSettings(s: GameSettings) {
+      this.settings = s;
+      this.saveGlobals();
+  }
+
+  getSettings() { return this.settings; }
+  
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -658,6 +670,7 @@ class GameService {
   getWeather() { return this.weather; }
   getMotd() { return this.motd; }
   getGlobalModifiers() { return this.globalModifiers; }
+  getSqliteStats() { return { size: sqliteService.getDbSize() }; }
 
   // Utils
   private checkLevelUp() {

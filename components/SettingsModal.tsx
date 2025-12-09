@@ -1,14 +1,20 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { X, Volume2, VolumeX, Speaker, Trash2, Info } from 'lucide-react';
+import { X, Volume2, VolumeX, Speaker, Trash2, Info, Database } from 'lucide-react';
 
 interface SettingsModalProps {
     onClose: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
-    const { settings, updateSettings, resetGameData } = useGame();
+    const { settings, updateSettings, resetGameData, getSqliteStats } = useGame();
+    const [dbSize, setDbSize] = useState<string>("Loading...");
+
+    useEffect(() => {
+        const stats = getSqliteStats();
+        setDbSize((stats.size / 1024).toFixed(2) + " KB");
+    }, []);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -76,6 +82,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         </div>
                     </div>
 
+                    {/* Database Status */}
+                    <div className="space-y-2">
+                        <h3 className="font-bold uppercase text-sm bg-gray-100 p-1 flex items-center gap-2">
+                            <Database size={14} /> Database Diagnostics
+                        </h3>
+                        <div className="flex justify-between text-xs font-mono border-2 border-dashed border-gray-300 p-2">
+                            <span>Engine:</span>
+                            <span className="font-bold text-green-600">SQLite 3 (WASM)</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-mono border-2 border-dashed border-gray-300 p-2 border-t-0">
+                            <span>DB Size:</span>
+                            <span className="font-bold">{dbSize}</span>
+                        </div>
+                    </div>
+
                     {/* Graphics */}
                     <div className="space-y-2">
                         <h3 className="font-bold uppercase text-sm bg-gray-100 p-1">Performance</h3>
@@ -102,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                     
                     <div className="text-center text-[10px] text-gray-400 font-mono mt-2">
-                        v1.2.0 - gOwOrk Canary Build
+                        v1.2.1 - gOwOrk SQLite Verified
                     </div>
                 </div>
             </div>
