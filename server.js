@@ -7,7 +7,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
-import archiver from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -985,7 +984,7 @@ app.delete('/api/admin/user/:id', (req, res) => {
 });
 
 // Database Export Endpoint (Protected)
-app.post('/api/admin/export-db', (req, res) => {
+app.post('/api/admin/export-db', async (req, res) => {
     try {
         const { userId, password_hash } = req.body;
         
@@ -999,32 +998,20 @@ app.post('/api/admin/export-db', (req, res) => {
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        res.attachment(`gowork_db_backup_${timestamp}.zip`);
+        const backupPath = path.join(__dirname, `gowork_backup_${timestamp}.db`);
 
-        const archive = archiver('zip', {
-            zlib: { level: 9 }
-        });
+        // Create backup using native better-sqlite3 functionality
+        await db.backup(backupPath);
 
-        archive.on('error', function(err) {
-            console.error("Archive Error", err);
-            if (!res.headersSent) {
-                res.status(500).send({error: err.message});
+        res.download(backupPath, `gowork_backup_${timestamp}.db`, (err) => {
+            if (err) {
+                 console.error("Download Error:", err);
+            }
+            // Cleanup after sending
+            if (fs.existsSync(backupPath)) {
+                fs.unlinkSync(backupPath);
             }
         });
-
-        // Pipe archive data to the response
-        archive.pipe(res);
-
-        // Add potential database files
-        const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
-        
-        files.forEach(f => {
-            if (fs.existsSync(f)) {
-                archive.file(f, { name: path.basename(f) });
-            }
-        });
-
-        archive.finalize();
 
         logAction(userId, 'ADMIN', 'Exported Database Backup');
 
