@@ -135,6 +135,25 @@ const INITIAL_BOSS = {
   description: "An endless horde of caffeine-deprived zombies."
 };
 
+const DEFAULT_QUESTS = [
+    {
+        baseId: 'daily_attendance',
+        title: 'Perfect Attendance',
+        description: 'Clock In for your shift today.',
+        reward_gold: 50,
+        reward_xp: 100,
+        type: 'Daily'
+    },
+    {
+        baseId: 'daily_tasks',
+        title: 'Busy Bee',
+        description: 'Complete 10 work actions.',
+        reward_gold: 75,
+        reward_xp: 50,
+        type: 'Daily'
+    }
+];
+
 // --- HELPER FUNCTIONS ---
 
 function logAction(userId, type, details) {
@@ -211,6 +230,33 @@ function damageBoss(amt) {
     }
 }
 
+function runMaintenance() {
+    const now = Date.now();
+    
+    // 1. Delete Expired Quests
+    db.prepare('DELETE FROM active_quests WHERE expires_at < ?').run(now);
+
+    // 2. Ensure Daily Quests exist for today
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    
+    // Set expiration to end of today
+    const expiration = new Date(today);
+    expiration.setHours(23, 59, 59, 999);
+    const expiresAt = expiration.getTime();
+    
+    for (const q of DEFAULT_QUESTS) {
+        const id = `${q.baseId}_${dateStr}`;
+        const existing = db.prepare('SELECT id FROM active_quests WHERE id = ?').get(id);
+        if (!existing) {
+             db.prepare(`
+                INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(id, q.title, q.description, q.reward_gold, q.reward_xp, q.type, expiresAt);
+        }
+    }
+}
+
 // --- ROUTES ---
 
 // Auth
@@ -244,6 +290,7 @@ app.get('/api/user/:id', (req, res) => {
 
 // Data Refresh
 app.get('/api/data/refresh', (req, res) => {
+    runMaintenance();
     const userId = req.query.userId;
     const users = db.prepare('SELECT * FROM users ORDER BY current_xp DESC').all().map(mapUser);
     const quests = db.prepare('SELECT * FROM active_quests').all();
