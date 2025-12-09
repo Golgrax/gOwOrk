@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
+    allowedHosts: [
+      'gowork-2kob.onrender.com',
+      'localhost',
+      '127.0.0.1'
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -14,5 +19,12 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  preview: {
+    allowedHosts: [
+      'gowork-2kob.onrender.com',
+      'localhost',
+      '127.0.0.1'
+    ]
   }
 })
