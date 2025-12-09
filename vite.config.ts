@@ -10,7 +10,8 @@ export default defineConfig({
     allowedHosts: [
       'gowork-2kob.onrender.com',
       'localhost',
-      '127.0.0.1'
+      '127.0.0.1',
+      '.onrender.com'
     ],
     proxy: {
       '/api': {
@@ -24,7 +25,8 @@ export default defineConfig({
     allowedHosts: [
       'gowork-2kob.onrender.com',
       'localhost',
-      '127.0.0.1'
+      '127.0.0.1',
+      '.onrender.com'
     ]
   }
 })

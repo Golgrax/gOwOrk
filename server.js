@@ -1053,5 +1053,14 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`\x1b[32m[SERVER] gOwOrk Online on port ${PORT}\x1b[0m`);
+    
+    // Check if build exists
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    if (!fs.existsSync(indexPath)) {
+        console.log(`\x1b[33m[WARNING] 'dist/index.html' not found. You must run 'npm run build' before 'npm start' to see the frontend.\x1b[0m`);
+    } else {
+        console.log(`\x1b[36m[INFO] Serving static files from /dist\x1b[0m`);
+        console.log(`\x1b[36m[INFO] Open: http://localhost:${PORT}\x1b[0m`);
+    }
 });
