@@ -74,16 +74,27 @@ class GameService {
   // --- API HELPER ---
   private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
       const headers = { 'Content-Type': 'application/json' };
-      const res = await fetch(`/api${endpoint}`, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined
-      });
-      if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'API Error');
+      try {
+          const res = await fetch(`/api${endpoint}`, {
+              method,
+              headers,
+              body: body ? JSON.stringify(body) : undefined
+          });
+
+          // Guard: Check if response is actually JSON (handles 404/500 HTML responses)
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || `Error ${res.status}: ${res.statusText}`);
+              return data;
+          } else {
+              // Received non-JSON response (likely 404 from Vite proxy failure)
+              throw new Error("Server Unreachable. Please ensure the backend (node server.js) is running.");
+          }
+      } catch (e: any) {
+          console.error("API Call Failed", e);
+          throw new Error(e.message || "Network Error");
       }
-      return res.json();
   }
 
   // --- AUTH ---
@@ -161,9 +172,7 @@ class GameService {
 
   async getTodayLog(dateOverride?: Date): Promise<AttendanceLog | undefined> {
       // For MVP, we can just assume clockIn check handles it or client stores it in state.
-      // But let's assume client handles the 'todayLog' state from the clockIn response mostly.
-      // Or we could add an endpoint.
-      return undefined; // Handled by state mostly in this simplified refactor
+      return undefined; 
   }
 
   async performWorkAction() {
@@ -177,8 +186,6 @@ class GameService {
       // Simpler client logic for break since it's just HP
       if (!this.user) throw new Error("No User");
       this.user.current_hp = Math.min(this.user.total_hp, this.user.current_hp + 15);
-      // We should sync this...
-      // For now, let's assume simple sync via performWorkAction later or next refresh
       return { user: this.user, recovered: 15 };
   }
 
