@@ -1,4 +1,6 @@
 
+
+
 import express from 'express';
 import Database from 'better-sqlite3';
 import cors from 'cors';
@@ -882,6 +884,27 @@ app.post('/api/admin/punish', (req, res) => {
     
     saveUser(user);
     logAction(userId, 'ADMIN', `Punished: -${amount} ${type}`);
+    res.json({ success: true });
+});
+
+app.delete('/api/admin/log/:id', (req, res) => {
+    const { id } = req.params;
+    db.prepare('DELETE FROM audit_logs WHERE id = ?').run(id);
+    res.json({ success: true });
+});
+
+app.delete('/api/admin/user/:id', (req, res) => {
+    const { id } = req.params;
+    const user = getUser(id);
+    if (!user) return res.status(404).json({error: "User not found"});
+    
+    // Cleanup manually
+    db.prepare('DELETE FROM attendance_logs WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM completed_quests WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM audit_logs WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    
+    printSystemLog('ADMIN', `Deleted account: ${user.username}`);
     res.json({ success: true });
 });
 

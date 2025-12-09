@@ -1,4 +1,6 @@
 
+
+
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -272,6 +274,14 @@ class GameService {
 
   async adminPunish(userId: string, type: 'gold' | 'xp' | 'hp', amount: number) {
       await this.apiCall('/admin/punish', 'POST', { userId, type, amount });
+  }
+
+  async deleteUserAccount(userId: string) {
+      await this.apiCall(`/admin/user/${userId}`, 'DELETE');
+  }
+
+  async deleteAuditLog(logId: string) {
+      await this.apiCall(`/admin/log/${logId}`, 'DELETE');
   }
 
   async getAuditLogs(): Promise<AuditLog[]> {

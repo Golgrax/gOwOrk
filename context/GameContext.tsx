@@ -1,4 +1,6 @@
 
+
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission, WheelPrize } from '../types';
 import { gameService } from '../services/gameService';
@@ -363,6 +365,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
      addToast(`Penalty Applied (-${amount} ${type.toUpperCase()})`, 'error');
      playSfx('error');
   }
+  
+  const deleteUserAccount = async (userId: string) => {
+      await gameService.deleteUserAccount(userId);
+      addToast('User Account Deleted', 'error');
+  }
+
+  const deleteAuditLog = async (logId: string) => {
+      await gameService.deleteAuditLog(logId);
+      addToast('Log Entry Deleted', 'info');
+  }
+
   const getAuditLogs = async () => { return await gameService.getAuditLogs(); }
 
   const getSqliteStats = () => gameService.getSqliteStats();
@@ -422,6 +435,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toggleBan,
       updateUser,
       punishUser,
+      deleteUserAccount,
+      deleteAuditLog,
       getAuditLogs,
       updateSettings,
       resetGameData,

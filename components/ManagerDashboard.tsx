@@ -1,13 +1,15 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock } from 'lucide-react';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock, Trash2 } from 'lucide-react';
 import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -121,6 +123,18 @@ export const ManagerDashboard: React.FC = () => {
           await toggleBan(userId);
           getTeamData().then(setTeamStats);
       }
+  }
+
+  const handleDeleteUser = async (userId: string, username: string) => {
+      if(window.confirm(`DANGER: Are you sure you want to DELETE user "${username}"?\nThis action cannot be undone. All logs and data will be removed.`)) {
+          await deleteUserAccount(userId);
+          getTeamData().then(setTeamStats);
+      }
+  }
+
+  const handleDeleteLog = async (logId: string) => {
+      await deleteAuditLog(logId);
+      gameService.getAuditLogs().then(setAuditLogs);
   }
 
   const handlePunish = async () => {
@@ -610,6 +624,15 @@ export const ManagerDashboard: React.FC = () => {
                                                        >
                                                            <Ban size={16} />
                                                        </button>
+                                                       {isManager && (
+                                                           <button 
+                                                              onClick={() => handleDeleteUser(u.id, u.name)}
+                                                              className="p-2 border-2 border-black bg-red-500 text-white hover:bg-red-600"
+                                                              title="Delete User"
+                                                           >
+                                                               <Trash2 size={16} />
+                                                           </button>
+                                                       )}
                                                    </>
                                                )}
                                            </div>
@@ -622,9 +645,7 @@ export const ManagerDashboard: React.FC = () => {
                </RetroCard>
            </div>
        )}
-       {/* Logs Table... */}
-       {/* Modals... */}
-       {/* ... (Existing code for logs and modals) ... */}
+
        {activeTab === 'logs' && (
            <RetroCard title="Activity Audit Logs" className="bg-white">
                {/* Log Filters */}
@@ -666,11 +687,12 @@ export const ManagerDashboard: React.FC = () => {
                                <th className="p-2 font-bold uppercase">User</th>
                                <th className="p-2 font-bold uppercase">Action</th>
                                <th className="p-2 font-bold uppercase">Details</th>
+                               <th className="p-2 font-bold uppercase text-right"></th>
                            </tr>
                        </thead>
                        <tbody>
                            {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                               <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50 font-mono">
+                               <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50 font-mono group">
                                    <td className="p-2 text-gray-600 whitespace-nowrap">
                                        {new Date(log.timestamp).toLocaleTimeString()}
                                    </td>
@@ -686,9 +708,20 @@ export const ManagerDashboard: React.FC = () => {
                                        </span>
                                    </td>
                                    <td className="p-2 text-gray-800">{log.details}</td>
+                                   <td className="p-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                                       {isManager && (
+                                           <button 
+                                             onClick={() => handleDeleteLog(log.id)}
+                                             className="text-gray-400 hover:text-red-500"
+                                             title="Delete Log Entry"
+                                           >
+                                               <Trash2 size={14} />
+                                           </button>
+                                       )}
+                                   </td>
                                </tr>
                            )) : (
-                               <tr><td colSpan={4} className="p-4 text-center text-gray-500">No logs found for this filter.</td></tr>
+                               <tr><td colSpan={5} className="p-4 text-center text-gray-500">No logs found for this filter.</td></tr>
                            )}
                        </tbody>
                    </table>

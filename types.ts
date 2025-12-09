@@ -216,6 +216,8 @@ export interface GameState {
   toggleBan: (userId: string) => Promise<void>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   punishUser: (userId: string, type: 'gold' | 'xp' | 'hp', amount: number) => Promise<void>;
+  deleteUserAccount: (userId: string) => Promise<void>;
+  deleteAuditLog: (logId: string) => Promise<void>;
   getAuditLogs: () => Promise<AuditLog[]>;
   // Settings & Audio
   updateSettings: (newSettings: Partial<GameSettings>) => void;
