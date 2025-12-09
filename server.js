@@ -496,6 +496,24 @@ app.post('/api/action/work', (req, res) => {
 
     user.current_hp -= cost;
     
+    // --- PET LOGIC ---
+    let petBonusMsg = "";
+    if (user.pet) {
+        // Decrease pet hunger (energy use)
+        user.pet.hunger = Math.max(0, user.pet.hunger - 5);
+        
+        // Pet Bonus only if not starving (> 20 hunger)
+        // Ensure pet level exists
+        if (!user.pet.level) user.pet.level = 1; 
+        
+        if (user.pet.hunger > 20) {
+            const perk = 1 + (user.pet.level * 0.05); // 5% per level
+            goldMultiplier *= perk;
+            xpMultiplier *= perk;
+            if (perk > 1) petBonusMsg = ` (Pet: +${Math.round((perk-1)*100)}%)`;
+        }
+    }
+
     let gold = Math.floor(Math.random() * 3) + 1;
     let xp = 5;
 
@@ -512,9 +530,9 @@ app.post('/api/action/work', (req, res) => {
     damageBoss(1);
     saveUser(user);
     
-    logAction(userId, 'WORK', `Earned: ${gold}G ${xp}XP ${bonusMessage}`);
+    logAction(userId, 'WORK', `Earned: ${gold}G ${xp}XP ${bonusMessage}${petBonusMsg}`);
     
-    res.json({ user, earned: `+${gold}G +${xp}XP${bonusMessage}` });
+    res.json({ user, earned: `+${gold}G +${xp}XP${bonusMessage}${petBonusMsg}` });
 });
 
 // BREAK ACTION
@@ -653,13 +671,33 @@ app.post('/api/action/feed-pet', (req, res) => {
     if (!user) return res.status(404).send();
     if (!user.pet) return res.status(400).json({error: "No pet"});
 
-    if (user.current_gold < 10) return res.status(400).json({error: "Not enough gold"});
-    user.current_gold -= 10;
-    user.pet.hunger = Math.min(100, user.pet.hunger + 20);
+    // Feed Cost increased to 20 to balance leveling value
+    if (user.current_gold < 20) return res.status(400).json({error: "Need 20G to feed"});
+    user.current_gold -= 20;
+    
+    // Restore Hunger
+    user.pet.hunger = Math.min(100, user.pet.hunger + 30);
     user.pet.happiness = Math.min(100, user.pet.happiness + 10);
 
+    // Initialize level if missing (migration)
+    if (!user.pet.level) user.pet.level = 1;
+    if (!user.pet.current_xp) user.pet.current_xp = 0;
+
+    // Add XP
+    user.pet.current_xp += 25;
+
+    // Check Level Up (Scaling Difficulty: Level * 100)
+    const xpRequired = user.pet.level * 100;
+    let levelUpMsg = "";
+    if (user.pet.current_xp >= xpRequired) {
+        user.pet.current_xp -= xpRequired;
+        user.pet.level++;
+        levelUpMsg = ` Level Up! Now Lvl ${user.pet.level}!`;
+        logAction(userId, 'SYSTEM', `Pet Leveled Up to ${user.pet.level}`);
+    }
+
     saveUser(user);
-    res.json({ user, msg: "Yum!" });
+    res.json({ user, msg: `Yum! (+25 XP)${levelUpMsg}` });
 });
 
 app.post('/api/action/kudos', (req, res) => {
@@ -708,7 +746,7 @@ app.post('/api/shop/buy', (req, res) => {
 
     user.current_gold -= cost;
     if (item.type === 'consumable') user.current_hp = Math.min(user.total_hp, user.current_hp + (item.effectValue || 0));
-    else if (item.type === 'pet') user.pet = { name: 'Doggo', hunger: 50, happiness: 100 };
+    else if (item.type === 'pet') user.pet = { name: 'Doggo', hunger: 50, happiness: 100, level: 1, current_xp: 0 };
     else user.inventory.push(itemId);
 
     saveUser(user);
@@ -889,7 +927,11 @@ app.post('/api/admin/punish', (req, res) => {
 
 app.delete('/api/admin/log/:id', (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM audit_logs WHERE id = ?').run(id);
+    const log = db.prepare('SELECT * FROM audit_logs WHERE id = ?').get(id);
+    if (log) {
+        db.prepare('DELETE FROM audit_logs WHERE id = ?').run(id);
+        printSystemLog('ADMIN', `Deleted Log [${log.action_type}] ${log.details} (User: ${log.user_id})`);
+    }
     res.json({ success: true });
 });
 

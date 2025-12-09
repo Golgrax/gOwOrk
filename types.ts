@@ -1,5 +1,7 @@
 
 
+
+
 export interface AvatarConfig {
   hat: string;
   eyes: string;
@@ -43,6 +45,8 @@ export interface Pet {
     name: string;
     hunger: number; // 0-100
     happiness: number; // 0-100
+    level: number;
+    current_xp: number;
 }
 
 export interface User {
