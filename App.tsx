@@ -98,6 +98,12 @@ const GameLayout: React.FC = () => {
       return <Sun className="text-yellow-400 animate-pulse" />;
   };
 
+  const getContainerWidth = () => {
+      if (currentView === 'security') return 'w-full max-w-[98vw]';
+      if (currentView === 'admin') return 'w-full max-w-5xl'; // Wider for tables
+      return 'max-w-2xl';
+  };
+
   return (
     <div className="relative h-screen w-full overflow-hidden text-gray-900 font-vt323">
       
@@ -148,7 +154,7 @@ const GameLayout: React.FC = () => {
         <ToastContainer />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide pointer-events-auto">
-           <div className={`${currentView === 'security' ? 'w-full max-w-[98vw]' : 'max-w-2xl'} mx-auto pb-24 transition-all duration-300`}>
+           <div className={`${getContainerWidth()} mx-auto pb-24 transition-all duration-300`}>
               {renderView()}
            </div>
         </main>
