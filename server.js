@@ -244,6 +244,7 @@ app.get('/api/user/:id', (req, res) => {
 
 // Data Refresh
 app.get('/api/data/refresh', (req, res) => {
+    const userId = req.query.userId;
     const users = db.prepare('SELECT * FROM users ORDER BY current_xp DESC').all().map(mapUser);
     const quests = db.prepare('SELECT * FROM active_quests').all();
     const bossRow = db.prepare("SELECT value FROM game_globals WHERE key = 'boss'").get();
@@ -252,10 +253,17 @@ app.get('/api/data/refresh', (req, res) => {
     const motdRow = db.prepare("SELECT value FROM game_globals WHERE key = 'motd'").get();
     const globalModsRow = db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get();
     
-    // Also include user quest status if needed, but for leaderboard we just send users
+    // Fetch user specific quest status
+    let userQuestStatus = {};
+    if (userId) {
+        const submissions = db.prepare('SELECT quest_id, status FROM completed_quests WHERE user_id = ?').all(userId);
+        submissions.forEach(s => userQuestStatus[s.quest_id] = s.status);
+    }
+
     res.json({
         leaderboard: users,
         activeQuests: quests,
+        userQuestStatus, // Send this back
         bossEvent: boss,
         weather: weatherRow ? weatherRow.value : 'Sunny',
         motd: motdRow ? motdRow.value : '',

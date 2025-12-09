@@ -42,6 +42,18 @@
         animation: shake 0.5s;
         animation-iteration-count: 1;
       }
+      
+      /* Toast Animations */
+      @keyframes toastSlideIn {
+        0% { transform: translateX(120%) scale(0.8); opacity: 0; }
+        60% { transform: translateX(-10%) scale(1.05); opacity: 1; }
+        80% { transform: translateX(5%) scale(0.95); }
+        100% { transform: translateX(0) scale(1); opacity: 1; }
+      }
+      .toast-anim {
+        animation: toastSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      }
+
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 10px;

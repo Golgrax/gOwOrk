@@ -124,7 +124,9 @@ class GameService {
   }
 
   async refreshData() {
-      const data = await this.apiCall('/data/refresh');
+      // Pass the userId so the server can return user-specific quest statuses
+      const userId = this.user ? this.user.id : '';
+      const data = await this.apiCall(`/data/refresh?userId=${userId}`);
       this.bossEvent = data.bossEvent;
       this.weather = data.weather;
       this.motd = data.motd;
@@ -178,7 +180,12 @@ class GameService {
 
   async getQuests() {
       const data = await this.refreshData();
-      return { active: data.activeQuests, userStatus: {}, nextRefresh: Date.now() + 3600000 };
+      // Ensure we use the userQuestStatus returned by the API
+      return { 
+          active: data.activeQuests, 
+          userStatus: data.userQuestStatus || {}, 
+          nextRefresh: Date.now() + 3600000 
+      };
   }
 
   async createQuest(quest: any, durationHours: number) {
