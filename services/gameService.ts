@@ -56,6 +56,7 @@ class GameService {
   private motd: string = "";
   private globalModifiers: GlobalModifiers = { xpMultiplier: 1, goldMultiplier: 1 };
   private settings: GameSettings = { musicVolume: 0.5, sfxVolume: 0.8, isMusicMuted: true, isSfxMuted: false, lowPerformanceMode: false };
+  private isAutoWeather: boolean = false;
 
   constructor() {}
 
@@ -131,6 +132,7 @@ class GameService {
       this.weather = data.weather;
       this.motd = data.motd;
       this.globalModifiers = data.globalModifiers;
+      this.isAutoWeather = data.autoWeather;
       return data;
   }
 
@@ -167,8 +169,9 @@ class GameService {
 
   async takeBreak() {
       if (!this.user) throw new Error("No User");
-      this.user.current_hp = Math.min(this.user.total_hp, this.user.current_hp + 15);
-      return { user: this.user, recovered: 15 };
+      const res = await this.apiCall('/action/take-break', 'POST', { userId: this.user.id });
+      this.user = res.user;
+      return { user: this.user, recovered: res.recovered, message: res.message };
   }
 
   async buyItem(itemId: string) {
@@ -285,6 +288,11 @@ class GameService {
       return await this.apiCall('/admin/stats');
   }
 
+  async toggleAutoWeather(enabled: boolean) {
+      await this.apiCall('/admin/auto-weather', 'POST', { enabled });
+      this.isAutoWeather = enabled;
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -295,6 +303,7 @@ class GameService {
   getGlobalModifiers() { return this.globalModifiers; }
   getSettings() { return this.settings; }
   getSqliteStats() { return { size: 0 }; } 
+  getIsAutoWeather() { return this.isAutoWeather; }
 
   // Stubs
   async getLeaderboard() { return (await this.refreshData()).leaderboard; }

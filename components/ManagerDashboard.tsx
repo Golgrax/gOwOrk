@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign } from 'lucide-react';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock } from 'lucide-react';
 import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -25,6 +25,7 @@ export const ManagerDashboard: React.FC = () => {
   // Logs State
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [logFilter, setLogFilter] = useState<'ALL' | 'PRIZES' | 'SHOP' | 'ADMIN'>('ALL');
+  const [logSearch, setLogSearch] = useState('');
 
   // Inbox State
   const [pendingQuests, setPendingQuests] = useState<QuestSubmission[]>([]);
@@ -150,20 +151,30 @@ export const ManagerDashboard: React.FC = () => {
       setGlobalEvent(newType as any);
   }
 
-  const weatherOptions: { type: WeatherType, icon: React.ReactNode }[] = [
-      { type: 'Sunny', icon: <Sun size={16} /> },
-      { type: 'Rainy', icon: <CloudRain size={16} /> },
-      { type: 'Snowy', icon: <Snowflake size={16} /> },
-      { type: 'Heatwave', icon: <Flame size={16} /> },
-      { type: 'Foggy', icon: <CloudFog size={16} /> },
+  const weatherOptions: { type: WeatherType, icon: React.ReactNode, perk: string }[] = [
+      { type: 'Sunny', icon: <Sun size={16} />, perk: 'Balanced' },
+      { type: 'Rainy', icon: <CloudRain size={16} />, perk: '+25 HP Rest' },
+      { type: 'Snowy', icon: <Snowflake size={16} />, perk: '1.5x XP / High Cost' },
+      { type: 'Heatwave', icon: <Flame size={16} />, perk: '1.5x Gold / High Cost' },
+      { type: 'Foggy', icon: <CloudFog size={16} />, perk: 'Lucky Gold Drops' },
   ];
 
   const filteredLogs = auditLogs.filter(log => {
-      if (logFilter === 'ALL') return true;
-      if (logFilter === 'PRIZES') return ['SPIN', 'QUEST', 'ARCADE'].includes(log.action_type);
-      if (logFilter === 'SHOP') return log.action_type === 'SHOP';
-      if (logFilter === 'ADMIN') return ['ADMIN', 'SYSTEM'].includes(log.action_type);
-      return true;
+      const typeMatch = (logFilter === 'ALL') 
+          || (logFilter === 'PRIZES' && ['SPIN', 'QUEST', 'ARCADE'].includes(log.action_type))
+          || (logFilter === 'SHOP' && log.action_type === 'SHOP')
+          || (logFilter === 'ADMIN' && ['ADMIN', 'SYSTEM'].includes(log.action_type));
+      
+      if (!typeMatch) return false;
+
+      const search = logSearch.toLowerCase();
+      if (!search) return true;
+
+      return (
+          log.details.toLowerCase().includes(search) || 
+          log.user_name?.toLowerCase().includes(search) ||
+          log.action_type.toLowerCase().includes(search)
+      );
   });
 
   const getFilteredPending = () => {
@@ -335,18 +346,28 @@ export const ManagerDashboard: React.FC = () => {
                        </div>
 
                        <div className="space-y-4 md:col-span-2">
-                           <h3 className="font-bold border-b-2 border-black">World Weather</h3>
-                           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                           <div className="flex justify-between items-center border-b-2 border-black">
+                               <h3 className="font-bold">World Weather</h3>
+                               <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer">
+                                   <input type="checkbox" checked={isAutoWeather} onChange={(e) => toggleAutoWeather(e.target.checked)} />
+                                   Auto-Schedule
+                               </label>
+                           </div>
+                           <div className={`grid grid-cols-2 md:grid-cols-5 gap-2 ${isAutoWeather ? 'opacity-50 pointer-events-none' : ''}`}>
                                {weatherOptions.map(opt => (
                                    <button
                                      key={opt.type}
                                      onClick={() => setWeather(opt.type)}
-                                     className={`p-2 border-2 border-black font-bold text-xs uppercase flex items-center gap-1 justify-center ${weather === opt.type ? 'bg-retro-gold' : 'bg-white hover:bg-gray-100'}`}
+                                     className={`p-2 border-2 border-black font-bold text-xs uppercase flex flex-col items-center gap-1 justify-center ${weather === opt.type ? 'bg-retro-gold' : 'bg-white hover:bg-gray-100'}`}
+                                     title={opt.perk}
                                    >
-                                       {opt.icon} {opt.type}
+                                       {opt.icon} 
+                                       <span>{opt.type}</span>
+                                       <span className="text-[9px] bg-black text-white px-1 rounded">{opt.perk}</span>
                                    </button>
                                ))}
                            </div>
+                           {isAutoWeather && <div className="text-xs text-center font-bold text-blue-600">Auto-Weather is Active (Changes based on Server Time)</div>}
                        </div>
                    </div>
                </RetroCard>
@@ -607,22 +628,34 @@ export const ManagerDashboard: React.FC = () => {
        {activeTab === 'logs' && (
            <RetroCard title="Activity Audit Logs" className="bg-white">
                {/* Log Filters */}
-               <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                   {['ALL', 'PRIZES', 'SHOP', 'ADMIN'].map((filter) => (
-                       <button
-                           key={filter}
-                           onClick={() => setLogFilter(filter as any)}
-                           className={`px-3 py-1 border-2 border-black text-xs font-bold uppercase flex items-center gap-1 ${
-                               logFilter === filter ? 'bg-black text-white' : 'bg-gray-100 hover:bg-gray-200'
-                           }`}
-                       >
-                           {filter === 'ALL' && <FileText size={12} />}
-                           {filter === 'PRIZES' && <Gift size={12} />}
-                           {filter === 'SHOP' && <Download size={12} className="rotate-180" />}
-                           {filter === 'ADMIN' && <Gavel size={12} />}
-                           {filter}
-                       </button>
-                   ))}
+               <div className="flex flex-col md:flex-row gap-4 mb-4 justify-between">
+                   <div className="flex gap-2 overflow-x-auto pb-2">
+                       {['ALL', 'PRIZES', 'SHOP', 'ADMIN'].map((filter) => (
+                           <button
+                               key={filter}
+                               onClick={() => setLogFilter(filter as any)}
+                               className={`px-3 py-1 border-2 border-black text-xs font-bold uppercase flex items-center gap-1 ${
+                                   logFilter === filter ? 'bg-black text-white' : 'bg-gray-100 hover:bg-gray-200'
+                               }`}
+                           >
+                               {filter === 'ALL' && <FileText size={12} />}
+                               {filter === 'PRIZES' && <Gift size={12} />}
+                               {filter === 'SHOP' && <Download size={12} className="rotate-180" />}
+                               {filter === 'ADMIN' && <Gavel size={12} />}
+                               {filter}
+                           </button>
+                       ))}
+                   </div>
+                   <div className="relative">
+                       <input 
+                           type="text" 
+                           placeholder="Search logs..." 
+                           className="border-2 border-black p-1 pl-8 w-full md:w-64 font-mono text-sm"
+                           value={logSearch}
+                           onChange={e => setLogSearch(e.target.value)}
+                       />
+                       <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                   </div>
                </div>
 
                <div className="overflow-x-auto">

@@ -10,6 +10,8 @@ interface ExtendedGameState extends Omit<GameState, 'login' | 'spinWheel' | 'rec
     getSqliteStats: () => { size: number };
     spinWheel: () => Promise<{ prize: WheelPrize }>;
     recordArcadePlay: (score: number) => Promise<void>;
+    toggleAutoWeather: (enabled: boolean) => Promise<void>;
+    isAutoWeather: boolean;
 }
 
 const GameContext = createContext<ExtendedGameState | undefined>(undefined);
@@ -34,6 +36,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [timeOffset, setTimeOffset] = useState<number>(0);
   const [motd, setMotdState] = useState<string>('');
   const [globalModifiers, setGlobalModifiers] = useState<GlobalModifiers>({ xpMultiplier: 1, goldMultiplier: 1 });
+  const [isAutoWeather, setIsAutoWeather] = useState(false);
   
   const [settings, setSettings] = useState<GameSettings>({
       musicVolume: 0.5,
@@ -58,6 +61,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setWeatherState(gameService.getWeather());
           setMotdState(gameService.getMotd());
           setGlobalModifiers(gameService.getGlobalModifiers());
+          setIsAutoWeather(gameService.getIsAutoWeather());
 
           const dbSettings = gameService.getSettings();
           setSettings(dbSettings);
@@ -99,6 +103,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setNextQuestRefresh(q.nextRefresh);
       setLeaderboard(l);
       setBossEvent(gameService.getBossEvent());
+      setIsAutoWeather(gameService.getIsAutoWeather());
   };
 
   const updateSettings = (newSettings: Partial<GameSettings>) => {
@@ -120,12 +125,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   const addToast = (msg: string, type: 'success' | 'error' | 'info') => {
-      // Use randomUUID if available, else fallback to random string to ensure uniqueness vs Date.now()
       const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
       
       setToasts(prev => {
           const newToasts = [...prev, { id, message: msg, type }];
-          // Limit to 5 max to prevent spamming/stuck UI
           if (newToasts.length > 5) return newToasts.slice(newToasts.length - 5);
           return newToasts;
       });
@@ -272,9 +275,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const takeBreak = async () => {
       try {
-          const { user: u, recovered } = await gameService.takeBreak();
+          const { user: u, recovered, message } = await gameService.takeBreak();
           setUser(u);
-          addToast(`Rested: +${recovered} HP`, 'info');
+          addToast(message || `Rested: +${recovered} HP`, 'info');
       } catch (e: any) {
           addToast(e.message, 'error');
       }
@@ -346,6 +349,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   }
 
+  const toggleAutoWeather = async (enabled: boolean) => {
+      await gameService.toggleAutoWeather(enabled);
+      setIsAutoWeather(enabled);
+      addToast(`Auto-Weather ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
+  }
+
   const exportData = async () => { return await gameService.exportAttendanceCSV(); }
   const toggleBan = async (userId: string) => { await gameService.toggleBan(userId); addToast('User Ban Status Updated', 'info'); }
   const updateUser = async (userId: string, data: Partial<User>) => { await gameService.updateUser(userId, data); addToast('User Profile Updated', 'success'); }
@@ -376,6 +385,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       motd,
       globalModifiers,
       settings,
+      isAutoWeather,
       login,
       logout,
       addXp,
@@ -407,6 +417,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getTeamData,
       giveBonus,
       setGlobalEvent,
+      toggleAutoWeather,
       exportData,
       toggleBan,
       updateUser,

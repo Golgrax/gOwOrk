@@ -232,15 +232,10 @@ function damageBoss(amt) {
 
 function runMaintenance() {
     const now = Date.now();
-    
-    // 1. Delete Expired Quests
     db.prepare('DELETE FROM active_quests WHERE expires_at < ?').run(now);
 
-    // 2. Ensure Daily Quests exist for today
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
-    
-    // Set expiration to end of today
     const expiration = new Date(today);
     expiration.setHours(23, 59, 59, 999);
     const expiresAt = expiration.getTime();
@@ -256,6 +251,34 @@ function runMaintenance() {
         }
     }
 }
+
+// --- WEATHER SCHEDULER ---
+// Run every minute to check if weather should change
+setInterval(() => {
+    const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
+    const isAuto = autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false;
+
+    if (isAuto) {
+        const now = new Date();
+        const hour = now.getHours();
+        let newWeather = 'Sunny';
+
+        // Schedule Logic
+        if (hour >= 0 && hour < 6) newWeather = 'Snowy'; // Cold Night
+        else if (hour >= 6 && hour < 9) newWeather = 'Foggy'; // Morning Mist
+        else if (hour >= 9 && hour < 12) newWeather = 'Sunny'; // Morning Sun
+        else if (hour >= 12 && hour < 15) newWeather = 'Heatwave'; // Peak Heat
+        else if (hour >= 15 && hour < 18) newWeather = 'Rainy'; // Afternoon Shower
+        else if (hour >= 18) newWeather = 'Sunny'; // Evening Clear
+
+        // Only update if changed
+        const currentRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
+        if (!currentRow || currentRow.value !== newWeather) {
+            db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('weather', ?)").run(newWeather);
+            console.log(`[AutoWeather] Changed to ${newWeather}`);
+        }
+    }
+}, 60000);
 
 // --- ROUTES ---
 
@@ -299,6 +322,7 @@ app.get('/api/data/refresh', (req, res) => {
     const weatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
     const motdRow = db.prepare("SELECT value FROM game_globals WHERE key = 'motd'").get();
     const globalModsRow = db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get();
+    const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
     
     // Fetch user specific quest status
     let userQuestStatus = {};
@@ -314,7 +338,8 @@ app.get('/api/data/refresh', (req, res) => {
         bossEvent: boss,
         weather: weatherRow ? weatherRow.value : 'Sunny',
         motd: motdRow ? motdRow.value : '',
-        globalModifiers: globalModsRow ? JSON.parse(globalModsRow.value) : { xpMultiplier: 1, goldMultiplier: 1 }
+        globalModifiers: globalModsRow ? JSON.parse(globalModsRow.value) : { xpMultiplier: 1, goldMultiplier: 1 },
+        autoWeather: autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false
     });
 });
 
@@ -376,13 +401,38 @@ app.post('/api/action/clock-out', (req, res) => {
     res.json(log);
 });
 
+// WORK ACTION WITH PERKS
 app.post('/api/action/work', (req, res) => {
     const { userId } = req.body;
     const user = getUser(userId);
     if (!user) return res.status(404).send();
 
     const weather = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get()?.value || 'Sunny';
-    let cost = (weather === 'Snowy') ? 5 : 2;
+    
+    // WEATHER PERKS LOGIC
+    let cost = 2; // Default Sunny
+    let goldMultiplier = 1;
+    let xpMultiplier = 1;
+    let bonusMessage = "";
+
+    if (weather === 'Snowy') {
+        cost = 5;
+        xpMultiplier = 1.5;
+        bonusMessage = " (Snowy: +XP)";
+    } else if (weather === 'Heatwave') {
+        cost = 3;
+        goldMultiplier = 1.5;
+        bonusMessage = " (Heat: +Gold)";
+    } else if (weather === 'Rainy') {
+        cost = 2; // Standard
+    } else if (weather === 'Foggy') {
+        cost = 2;
+        // Lucky Find Chance
+        if (Math.random() < 0.1) {
+            goldMultiplier = 5; // Big spike
+            bonusMessage = " (LUCKY FIND!)";
+        }
+    }
 
     if (user.current_hp < cost) return res.status(400).json({ error: "You are too tired! Take a break." });
 
@@ -392,8 +442,10 @@ app.post('/api/action/work', (req, res) => {
     let xp = 5;
 
     const mods = JSON.parse(db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get()?.value || '{"xpMultiplier":1, "goldMultiplier":1}');
-    gold = Math.floor(gold * getSkillMultiplier(user, 'gold_boost') * mods.goldMultiplier);
-    xp = Math.floor(xp * getSkillMultiplier(user, 'xp_boost') * mods.xpMultiplier);
+    
+    // Apply Multipliers
+    gold = Math.floor(gold * getSkillMultiplier(user, 'gold_boost') * mods.goldMultiplier * goldMultiplier);
+    xp = Math.floor(xp * getSkillMultiplier(user, 'xp_boost') * mods.xpMultiplier * xpMultiplier);
 
     user.current_gold += gold;
     user.current_xp += xp;
@@ -401,9 +453,30 @@ app.post('/api/action/work', (req, res) => {
     checkLevelUp(user);
     damageBoss(1);
     saveUser(user);
-    // Work is frequent, maybe don't log every click to audit logs to avoid spam, 
-    // or log only significant milestones.
-    res.json({ user, earned: `+${gold}G +${xp}XP` });
+    
+    res.json({ user, earned: `+${gold}G +${xp}XP${bonusMessage}` });
+});
+
+// BREAK ACTION
+app.post('/api/action/take-break', (req, res) => {
+    const { userId } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+
+    const weather = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get()?.value || 'Sunny';
+    
+    let recoverAmount = 15;
+    let msg = "";
+
+    if (weather === 'Rainy') {
+        recoverAmount = 25; // Bonus recovery in rain
+        msg = " (Rainy: Bonus Healing)";
+    }
+
+    user.current_hp = Math.min(user.total_hp, user.current_hp + recoverAmount);
+    saveUser(user);
+
+    res.json({ user, recovered: recoverAmount, message: `Rested: +${recoverAmount} HP${msg}` });
 });
 
 app.post('/api/action/submit-quest', (req, res) => {
@@ -626,6 +699,12 @@ app.post('/api/admin/event', (req, res) => {
     
     db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('modifiers', ?)").run(JSON.stringify(mods));
     res.json(mods);
+});
+
+app.post('/api/admin/auto-weather', (req, res) => {
+    const { enabled } = req.body;
+    db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('auto_weather', ?)").run(JSON.stringify({ enabled }));
+    res.json({ success: true, enabled });
 });
 
 app.get('/api/admin/stats', (req, res) => {
