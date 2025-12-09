@@ -13,16 +13,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+// Render sets process.env.PORT. Fallback to 3000 for local.
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || 'gowork.db';
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+// Serve built frontend files from /dist
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- DATABASE SETUP ---
-// Ensure directory exists if using a custom path
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
