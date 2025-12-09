@@ -11,7 +11,8 @@ export const ToastContainer: React.FC = () => {
         <div 
           key={t.id} 
           className={`
-            min-w-[200px] p-3 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)] font-bold uppercase text-sm animate-bounce
+            min-w-[200px] p-3 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)] font-bold uppercase text-sm 
+            animate-in slide-in-from-right fade-in duration-300
             ${t.type === 'success' ? 'bg-retro-green text-black' : 
               t.type === 'error' ? 'bg-retro-red text-white' : 'bg-white text-black'}
           `}

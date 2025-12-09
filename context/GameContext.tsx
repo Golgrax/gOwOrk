@@ -120,11 +120,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   const addToast = (msg: string, type: 'success' | 'error' | 'info') => {
-      const id = Date.now().toString();
-      setToasts(prev => [...prev, { id, message: msg, type }]);
+      // Use randomUUID if available, else fallback to random string to ensure uniqueness vs Date.now()
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+      
+      setToasts(prev => {
+          const newToasts = [...prev, { id, message: msg, type }];
+          // Limit to 5 max to prevent spamming/stuck UI
+          if (newToasts.length > 5) return newToasts.slice(newToasts.length - 5);
+          return newToasts;
+      });
+
       if (type === 'success') playSfx('success');
       else if (type === 'error') playSfx('error');
       else playSfx('button');
+
       setTimeout(() => {
           setToasts(prev => prev.filter(t => t.id !== id));
       }, 3000);
