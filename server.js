@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
+import archiver from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -980,6 +981,58 @@ app.delete('/api/admin/user/:id', (req, res) => {
     
     printSystemLog('ADMIN', `Deleted account: ${user.username}`);
     res.json({ success: true });
+});
+
+// Database Export Endpoint (Protected)
+app.post('/api/admin/export-db', (req, res) => {
+    try {
+        const { userId, password_hash } = req.body;
+        
+        // Auth Check
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+        if (!user || user.password_hash !== password_hash) {
+             return res.status(403).json({ error: "Invalid Credentials" });
+        }
+        if (user.role !== 'manager') {
+             return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        res.attachment(`gowork_db_backup_${timestamp}.zip`);
+
+        const archive = archiver('zip', {
+            zlib: { level: 9 }
+        });
+
+        archive.on('error', function(err) {
+            console.error("Archive Error", err);
+            if (!res.headersSent) {
+                res.status(500).send({error: err.message});
+            }
+        });
+
+        // Pipe archive data to the response
+        archive.pipe(res);
+
+        // Add potential database files
+        const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
+        
+        files.forEach(f => {
+            if (fs.existsSync(f)) {
+                archive.file(f, { name: path.basename(f) });
+            }
+        });
+
+        archive.finalize();
+
+        logAction(userId, 'ADMIN', 'Exported Database Backup');
+
+    } catch (e) {
+        console.error("Export DB Error:", e);
+        if (!res.headersSent) {
+            res.status(500).send({ error: "Failed to export database" });
+        }
+    }
 });
 
 // Fallback for SPA

@@ -1,4 +1,5 @@
 
+
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -318,6 +319,35 @@ class GameService {
       await this.apiCall('/admin/give-bonus', 'POST', { userId, amount });
   }
 
+  async exportAttendanceCSV() { return ""; } // Legacy stub
+  
+  // NEW: DB Export Protected
+  async exportDatabase(password: string) {
+      if (!this.user) return;
+      
+      const hash = await this.hashPassword(password);
+      
+      const res = await fetch('/api/admin/export-db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: this.user.id, password_hash: hash })
+      });
+
+      if (!res.ok) {
+          throw new Error("Export failed: Incorrect password or unauthorized.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gowork_db_backup_${new Date().toISOString()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -335,7 +365,6 @@ class GameService {
   setWeather(w: WeatherType) { this.weather = w; }
   setMotd(m: string) { this.motd = m; }
   saveSettings(s: GameSettings) { this.settings = s; }
-  async exportAttendanceCSV() { return ""; }
   resetGameData() { /* Stub */ }
 }
 

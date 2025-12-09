@@ -1,13 +1,14 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock, Trash2 } from 'lucide-react';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock, Trash2, Database } from 'lucide-react';
 import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, exportDatabase, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -114,6 +115,13 @@ export const ManagerDashboard: React.FC = () => {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+  };
+
+  const handleExportDb = async () => {
+      const pwd = window.prompt("Security Check: Enter your password to export the database.");
+      if (pwd) {
+          await exportDatabase(pwd);
+      }
   };
 
   const handleToggleBan = async (userId: string) => {
@@ -558,15 +566,22 @@ export const ManagerDashboard: React.FC = () => {
 
        {activeTab === 'manage' && isModerator && teamStats && (
            <div className="space-y-6">
-               {/* Same content as before, unchanged */}
                <RetroCard title="Data Management" className="bg-white">
-                   <p className="text-sm text-gray-600 mb-4">Export attendance logs for payroll processing.</p>
-                   <button 
-                     onClick={handleExport}
-                     className="bg-green-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex items-center gap-2 hover:bg-green-500"
-                   >
-                       <Download size={16} /> Export Logs (CSV)
-                   </button>
+                   <p className="text-sm text-gray-600 mb-4">Export system data for backup or payroll.</p>
+                   <div className="flex flex-col md:flex-row gap-4">
+                       <button 
+                         onClick={handleExport}
+                         className="flex-1 bg-green-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-green-500"
+                       >
+                           <Download size={16} /> Export Logs (CSV)
+                       </button>
+                       <button 
+                         onClick={handleExportDb}
+                         className="flex-1 bg-blue-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-blue-500"
+                       >
+                           <Database size={16} /> Export Database (SQL)
+                       </button>
+                   </div>
                </RetroCard>
 
                <RetroCard title="Staff Management" className="bg-white">

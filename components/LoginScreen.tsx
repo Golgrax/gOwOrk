@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { Gamepad2, User, KeyRound, UserPlus, LogIn } from 'lucide-react';
+import { Gamepad2, User, KeyRound, UserPlus, LogIn, Check } from 'lucide-react';
 import { gameService } from '../services/gameService';
 
 export const LoginScreen: React.FC = () => {
   const { login } = useGame();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,22 +22,16 @@ export const LoginScreen: React.FC = () => {
         if (!username || !password) throw new Error("Please fill in all fields");
 
         if (isRegistering) {
+            if (password !== confirmPassword) {
+                throw new Error("Passwords do not match");
+            }
+            if (password.length < 4) {
+                throw new Error("Password must be at least 4 characters");
+            }
             await gameService.register(username, password);
             // Auto login after register
-            await login(username); 
+            await login(username, password); 
         } else {
-            // Usually login handles the state update via context, 
-            // but we need to pass password now.
-            // Note: The context `login` function in GameContext needs update to accept password?
-            // Actually `useGame().login` calls `gameService.login`. 
-            // We need to bypass context or update context signature. 
-            // Let's assume we updated context or call service directly then refresh context?
-            // Proper way: Update GameContext signature. But for now, let's try calling the context method
-            // which wraps gameService. The Context wrapper likely doesn't accept password in previous file.
-            // I will implement a direct call here if Context isn't updated, 
-            // BUT I should update Context signature in a real app.
-            // Since I cannot change GameContext.tsx in this XML block (I can only provide changes),
-            // I will rely on the fact that I *can* update GameContext in the next change block.
             await login(username, password); 
         }
     } catch (e: any) {
@@ -44,6 +39,13 @@ export const LoginScreen: React.FC = () => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const toggleMode = () => {
+      setIsRegistering(!isRegistering);
+      setError(null);
+      setPassword('');
+      setConfirmPassword('');
   };
 
   return (
@@ -78,6 +80,21 @@ export const LoginScreen: React.FC = () => {
                />
             </div>
 
+            {isRegistering && (
+                <div className="text-left animate-in slide-in-from-top-2 fade-in duration-300">
+                   <label className="block font-bold mb-1 flex items-center gap-2 text-blue-600"><Check size={16}/> CONFIRM PASSWORD</label>
+                   <input 
+                     type="password" 
+                     value={confirmPassword}
+                     onChange={(e) => setConfirmPassword(e.target.value)}
+                     className={`w-full border-4 p-2 font-mono text-lg focus:bg-blue-50 outline-none ${
+                         confirmPassword && password !== confirmPassword ? 'border-red-500 bg-red-50' : 'border-black'
+                     }`}
+                     placeholder="Re-enter password"
+                   />
+                </div>
+            )}
+
             {error && (
                 <div className="bg-red-100 border-2 border-red-500 text-red-700 p-2 font-bold text-sm">
                     {error}
@@ -99,7 +116,7 @@ export const LoginScreen: React.FC = () => {
          <div className="mt-4 pt-4 border-t-2 border-gray-100">
              <button 
                 type="button"
-                onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
+                onClick={toggleMode}
                 className="text-gray-500 text-sm hover:text-black font-bold underline"
              >
                  {isRegistering ? "Already have an account? Login" : "New hire? Create Account"}

@@ -1,16 +1,18 @@
 
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission, WheelPrize } from '../types';
 import { gameService } from '../services/gameService';
 import { audioService } from '../services/audioService';
 import confetti from 'canvas-confetti';
 
-interface ExtendedGameState extends Omit<GameState, 'login' | 'spinWheel' | 'recordArcadePlay'> {
+interface ExtendedGameState extends Omit<GameState, 'login' | 'spinWheel' | 'recordArcadePlay' | 'exportDatabase'> {
     login: (username: string, password?: string) => Promise<void>;
     getSqliteStats: () => { size: number };
     spinWheel: () => Promise<{ prize: WheelPrize }>;
     recordArcadePlay: (score: number) => Promise<void>;
     toggleAutoWeather: (enabled: boolean) => Promise<void>;
+    exportDatabase: (password: string) => Promise<void>;
     isAutoWeather: boolean;
 }
 
@@ -363,6 +365,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   const exportData = async () => { return await gameService.exportAttendanceCSV(); }
+  const exportDatabase = async (password: string) => { 
+      try {
+          await gameService.exportDatabase(password); 
+          addToast('Database Export Started', 'info'); 
+      } catch (e: any) {
+          addToast(e.message || 'Export Failed', 'error');
+      }
+  }
+
   const toggleBan = async (userId: string) => { await gameService.toggleBan(userId); addToast('User Ban Status Updated', 'info'); }
   const updateUser = async (userId: string, data: Partial<User>) => { await gameService.updateUser(userId, data); addToast('User Profile Updated', 'success'); }
   const punishUser = async (userId: string, type: 'gold' | 'xp' | 'hp', amount: number) => {
@@ -443,6 +454,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setGlobalEvent,
       toggleAutoWeather,
       exportData,
+      exportDatabase,
       toggleBan,
       updateUser,
       punishUser,
