@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
@@ -9,7 +7,7 @@ import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../type
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -135,6 +133,18 @@ export const ManagerDashboard: React.FC = () => {
   const handleDeleteLog = async (logId: string) => {
       await deleteAuditLog(logId);
       gameService.getAuditLogs().then(setAuditLogs);
+  }
+
+  const handleClearAllLogs = async () => {
+      const pwd = window.prompt("DANGER: This will delete ALL audit logs history.\nEnter your password to confirm:");
+      if (pwd) {
+          try {
+              await clearAllAuditLogs(pwd);
+              gameService.getAuditLogs().then(setAuditLogs);
+          } catch(e: any) {
+              addToast(e.message || "Operation failed", "error");
+          }
+      }
   }
 
   const handlePunish = async () => {
@@ -548,6 +558,7 @@ export const ManagerDashboard: React.FC = () => {
 
        {activeTab === 'manage' && isModerator && teamStats && (
            <div className="space-y-6">
+               {/* Same content as before, unchanged */}
                <RetroCard title="Data Management" className="bg-white">
                    <p className="text-sm text-gray-600 mb-4">Export attendance logs for payroll processing.</p>
                    <button 
@@ -667,7 +678,7 @@ export const ManagerDashboard: React.FC = () => {
                            </button>
                        ))}
                    </div>
-                   <div className="relative">
+                   <div className="relative flex items-center gap-2">
                        <input 
                            type="text" 
                            placeholder="Search logs..." 
@@ -676,6 +687,16 @@ export const ManagerDashboard: React.FC = () => {
                            onChange={e => setLogSearch(e.target.value)}
                        />
                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                       
+                       {isManager && (
+                           <button 
+                               onClick={handleClearAllLogs}
+                               className="bg-red-600 text-white px-3 py-1 border-2 border-black font-bold uppercase hover:bg-red-500 flex items-center gap-1 text-xs"
+                               title="Clear All Logs (Requires Password)"
+                           >
+                               <Trash2 size={12} /> Clear All
+                           </button>
+                       )}
                    </div>
                </div>
 

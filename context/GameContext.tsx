@@ -1,6 +1,4 @@
 
-
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission, WheelPrize } from '../types';
 import { gameService } from '../services/gameService';
@@ -376,6 +374,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addToast('Log Entry Deleted', 'info');
   }
 
+  const clearAllAuditLogs = async (password: string) => {
+      await gameService.clearAllAuditLogs(password);
+      addToast('All Audit Logs Cleared', 'error');
+  }
+
   const getAuditLogs = async () => { return await gameService.getAuditLogs(); }
 
   const getSqliteStats = () => gameService.getSqliteStats();
@@ -437,6 +440,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       punishUser,
       deleteUserAccount,
       deleteAuditLog,
+      clearAllAuditLogs,
       getAuditLogs,
       updateSettings,
       resetGameData,

@@ -1,6 +1,4 @@
 
-
-
 import express from 'express';
 import Database from 'better-sqlite3';
 import cors from 'cors';
@@ -932,6 +930,23 @@ app.delete('/api/admin/log/:id', (req, res) => {
         db.prepare('DELETE FROM audit_logs WHERE id = ?').run(id);
         printSystemLog('ADMIN', `Deleted Log [${log.action_type}] ${log.details} (User: ${log.user_id})`);
     }
+    res.json({ success: true });
+});
+
+app.post('/api/admin/audit-logs/clear', (req, res) => {
+    const { userId, password_hash } = req.body;
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    
+    if (!user) return res.status(404).json({error: "User not found"});
+    
+    // Verify Password Hash
+    if (user.password_hash !== password_hash) {
+        return res.status(403).json({error: "Incorrect Password"});
+    }
+
+    // Execute Clear
+    db.prepare('DELETE FROM audit_logs').run();
+    printSystemLog('ADMIN', `CLEARED ALL AUDIT LOGS (Action by: ${user.username})`);
     res.json({ success: true });
 });
 

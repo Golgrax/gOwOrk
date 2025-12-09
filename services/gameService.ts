@@ -1,6 +1,4 @@
 
-
-
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -282,6 +280,15 @@ class GameService {
 
   async deleteAuditLog(logId: string) {
       await this.apiCall(`/admin/log/${logId}`, 'DELETE');
+  }
+
+  async clearAllAuditLogs(password: string) {
+      if (!this.user) throw new Error("Unauthorized");
+      const hash = await this.hashPassword(password);
+      await this.apiCall('/admin/audit-logs/clear', 'POST', { 
+          userId: this.user.id,
+          password_hash: hash 
+      });
   }
 
   async getAuditLogs(): Promise<AuditLog[]> {

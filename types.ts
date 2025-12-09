@@ -1,7 +1,4 @@
 
-
-
-
 export interface AvatarConfig {
   hat: string;
   eyes: string;
@@ -222,6 +219,7 @@ export interface GameState {
   punishUser: (userId: string, type: 'gold' | 'xp' | 'hp', amount: number) => Promise<void>;
   deleteUserAccount: (userId: string) => Promise<void>;
   deleteAuditLog: (logId: string) => Promise<void>;
+  clearAllAuditLogs: (password: string) => Promise<void>; // NEW
   getAuditLogs: () => Promise<AuditLog[]>;
   // Settings & Audio
   updateSettings: (newSettings: Partial<GameSettings>) => void;
