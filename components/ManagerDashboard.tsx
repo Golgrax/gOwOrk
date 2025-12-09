@@ -35,9 +35,10 @@ export const ManagerDashboard: React.FC = () => {
   const [punishMode, setPunishMode] = useState<{userId: string, type: 'gold' | 'xp' | 'hp', amount: number} | null>(null);
 
   const isManager = user?.role === 'manager';
+  const isModerator = user?.role === 'moderator' || isManager; // Mods have partial access
 
   useEffect(() => {
-      if ((activeTab === 'team' || activeTab === 'manage') && isManager) {
+      if ((activeTab === 'team' || activeTab === 'manage') && isModerator) {
           getTeamData().then(setTeamStats);
       }
       if (activeTab === 'logs') {
@@ -46,7 +47,7 @@ export const ManagerDashboard: React.FC = () => {
       if (activeTab === 'inbox') {
           refreshInbox();
       }
-  }, [activeTab, isManager]);
+  }, [activeTab, isModerator]);
 
   const refreshInbox = async () => {
       try {
@@ -174,19 +175,24 @@ export const ManagerDashboard: React.FC = () => {
            
            {/* Restricted Tabs - Managers Only */}
            {isManager && (
+               <button 
+                 onClick={() => setActiveTab('control')}
+                 className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'control' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+               >
+                   <Zap size={20}/> Controls
+               </button>
+           )}
+
+           {isModerator && (
                <>
-                   <button 
-                     onClick={() => setActiveTab('control')}
-                     className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'control' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
-                   >
-                       <Zap size={20}/> Controls
-                   </button>
-                   <button 
-                     onClick={() => setActiveTab('team')}
-                     className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'team' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
-                   >
-                       <BarChart3 size={20}/> Analytics
-                   </button>
+                   {isManager && (
+                       <button 
+                         onClick={() => setActiveTab('team')}
+                         className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'team' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
+                       >
+                           <BarChart3 size={20}/> Analytics
+                       </button>
+                   )}
                    <button 
                      onClick={() => setActiveTab('manage')}
                      className={`flex-1 min-w-[100px] p-3 font-bold uppercase flex items-center justify-center gap-2 ${activeTab === 'manage' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
@@ -453,7 +459,7 @@ export const ManagerDashboard: React.FC = () => {
            </div>
        )}
 
-       {activeTab === 'manage' && isManager && (
+       {activeTab === 'manage' && isModerator && (
            <div className="space-y-6">
                <RetroCard title="Data Management" className="bg-white">
                    <p className="text-sm text-gray-600 mb-4">Export attendance logs for payroll processing.</p>
@@ -488,29 +494,35 @@ export const ManagerDashboard: React.FC = () => {
                                        <td className="p-3 uppercase text-xs font-bold text-black">{u.role}</td>
                                        <td className="p-3 text-right">
                                            <div className="flex justify-end gap-2">
-                                               <button 
-                                                 onClick={() => setEditingUser(u)}
-                                                 className="p-2 border-2 border-black bg-white hover:bg-gray-100 text-black"
-                                                 title="Edit Profile"
-                                               >
-                                                   <UserCog size={16} />
-                                               </button>
                                                {isManager && (
+                                                   <button 
+                                                     onClick={() => setEditingUser(u)}
+                                                     className="p-2 border-2 border-black bg-white hover:bg-gray-100 text-black"
+                                                     title="Edit Profile"
+                                                   >
+                                                       <UserCog size={16} />
+                                                   </button>
+                                               )}
+                                               {isManager && (
+                                                   <button 
+                                                     onClick={() => handleGiveBonus(u.id)}
+                                                     className="p-2 border-2 border-black bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+                                                     title="Give Bonus"
+                                                   >
+                                                       <Gift size={16} />
+                                                   </button>
+                                               )}
+                                               {isModerator && (
                                                    <>
-                                                       <button 
-                                                         onClick={() => handleGiveBonus(u.id)}
-                                                         className="p-2 border-2 border-black bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
-                                                         title="Give Bonus"
-                                                       >
-                                                           <Gift size={16} />
-                                                       </button>
-                                                       <button 
-                                                          onClick={() => setPunishMode({userId: u.id, type: 'hp', amount: 10})}
-                                                          className="p-2 border-2 border-black bg-red-100 hover:bg-red-200 text-red-800"
-                                                          title="Punish (Smite)"
-                                                       >
-                                                           <Gavel size={16} />
-                                                       </button>
+                                                       {isManager && (
+                                                           <button 
+                                                              onClick={() => setPunishMode({userId: u.id, type: 'hp', amount: 10})}
+                                                              className="p-2 border-2 border-black bg-red-100 hover:bg-red-200 text-red-800"
+                                                              title="Punish (Smite)"
+                                                           >
+                                                               <Gavel size={16} />
+                                                           </button>
+                                                       )}
                                                        <button 
                                                           onClick={() => handleToggleBan(u.id)}
                                                           className="p-2 border-2 border-black bg-gray-800 text-white hover:bg-black"
@@ -530,7 +542,9 @@ export const ManagerDashboard: React.FC = () => {
                </RetroCard>
            </div>
        )}
-
+       {/* Logs Table... */}
+       {/* Modals... */}
+       {/* ... (Existing code for logs and modals) ... */}
        {activeTab === 'logs' && (
            <RetroCard title="Activity Audit Logs" className="bg-white">
                {/* Log Filters */}

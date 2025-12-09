@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { AvatarConfig } from '../types';
@@ -10,6 +11,7 @@ interface AvatarProps {
 
 export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOverdrive }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef(0);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -141,11 +143,11 @@ export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOver
 
     // --- ANIMATION LOOP ---
     let frameId: number;
-    let time = 0;
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
-      time += isOverdrive ? 0.15 : 0.05;
+      timeRef.current += isOverdrive ? 0.15 : 0.05;
+      const time = timeRef.current;
 
       // Bobbing
       charGroup.position.y = Math.sin(time) * 0.2;

@@ -13,6 +13,13 @@ interface GameSceneProps {
 export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverdrive }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const { weather, user } = useGame();
+  
+  // Use a ref to persist time across re-renders/effect cleanups
+  const timeRef = useRef(0);
+
+  // Stabilize dependencies to prevent re-renders on identical object references
+  const petKey = JSON.stringify(user?.pet);
+  const configKey = JSON.stringify(config);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -133,10 +140,11 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
     // --- CHARACTER ---
     const charGroup = new THREE.Group();
     
+    const parsedConfig = JSON.parse(configKey);
     // Config Colors
     const skinColor = 0xffdbac;
     let clothColor = 0x4ade80; // Default Green
-    if (config.clothing === 'suit_black') clothColor = 0x111111;
+    if (parsedConfig.clothing === 'suit_black') clothColor = 0x111111;
 
     // Body
     const body = createBox(4, 5, 2, clothColor, 0, 2.5, 0);
@@ -148,9 +156,9 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
     headGroup.add(createBox(3.5, 3.5, 3.5, skinColor, 0, 1.75, 0));
     
     // Eyes
-    if (config.eyes === 'sunglasses') {
+    if (parsedConfig.eyes === 'sunglasses') {
        headGroup.add(createBox(3.6, 0.8, 0.5, 0x111111, 0, 2, 1.6));
-    } else if (config.eyes === 'monocle') {
+    } else if (parsedConfig.eyes === 'monocle') {
        headGroup.add(createBox(1, 1, 0.2, 0xffd700, -0.8, 2, 1.8)); // Gold monocle
     } else {
        headGroup.add(createBox(0.5, 0.5, 0.2, 0x111111, -0.8, 2, 1.8));
@@ -158,15 +166,15 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
     }
 
     // Hat logic
-    if (config.hat === 'cap_red') {
+    if (parsedConfig.hat === 'cap_red') {
       const hatColor = 0xf87171;
       headGroup.add(createBox(3.7, 1, 3.7, hatColor, 0, 3.8, 0));
       headGroup.add(createBox(3.7, 0.2, 1.5, hatColor, 0, 3.6, 2));
-    } else if (config.hat === 'cap_blue') {
+    } else if (parsedConfig.hat === 'cap_blue') {
       const hatColor = 0x3b82f6;
       headGroup.add(createBox(3.7, 1, 3.7, hatColor, 0, 3.8, 0));
       headGroup.add(createBox(3.7, 0.2, 1.5, hatColor, 0, 3.6, 2));
-    } else if (config.hat === 'crown_gold') {
+    } else if (parsedConfig.hat === 'crown_gold') {
        // Crown spikes
        headGroup.add(createBox(3.7, 1.5, 3.7, 0xffd700, 0, 4, 0));
     }
@@ -189,7 +197,9 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
 
     // --- DOG (IF OWNED) ---
     let dogGroup: THREE.Group | undefined;
-    if (user?.pet) {
+    const parsedPet = JSON.parse(petKey || 'null');
+    
+    if (parsedPet) {
         dogGroup = new THREE.Group();
         const dogColor = 0x8D6E63; // Brown
         const dogBody = createBox(2.5, 1.5, 3, dogColor, 0, 1.5, 0);
@@ -207,11 +217,12 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
 
     // --- ANIMATION ---
     let frameId: number;
-    let time = 0;
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
-      time += isOverdrive ? 0.1 : 0.03;
+      // Increment persistent time ref
+      timeRef.current += isOverdrive ? 0.1 : 0.03;
+      const time = timeRef.current;
 
       charGroup.scale.y = 1 + Math.sin(time * 2) * 0.02;
       leftArm.rotation.x = Math.sin(time) * 0.1;
@@ -242,7 +253,7 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
           const tail = dogGroup.children[2];
           tail.rotation.z = Math.sin(time * 10) * 0.4;
           // Happy jump if full
-          if (user?.pet?.hunger && user.pet.hunger > 80) {
+          if (parsedPet?.hunger && parsedPet.hunger > 80) {
               dogGroup.position.y = Math.abs(Math.sin(time * 5)) * 0.5;
           }
           // Follow player gently
@@ -275,9 +286,10 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameId);
       if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
+      renderer.geometry?.dispose();
       renderer.dispose();
     };
-  }, [config, hpPercent, isOverdrive, weather, user?.pet]); // Re-render when pet status changes
+  }, [configKey, hpPercent, isOverdrive, weather, petKey]); 
 
   return <div ref={mountRef} className="fixed inset-0 z-0 bg-black" />;
 };
