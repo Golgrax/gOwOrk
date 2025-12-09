@@ -1,14 +1,15 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission } from '../types';
+import { User, Quest, AttendanceLog, GameState, ShopItem, AvatarConfig, BossEvent, WeatherType, ToastMessage, Skill, TeamStats, GlobalModifiers, GameSettings, QuestSubmission, WheelPrize } from '../types';
 import { gameService } from '../services/gameService';
 import { audioService } from '../services/audioService';
 import confetti from 'canvas-confetti';
 
-// Extend GameState to support password in login
-interface ExtendedGameState extends Omit<GameState, 'login'> {
+interface ExtendedGameState extends Omit<GameState, 'login' | 'spinWheel' | 'recordArcadePlay'> {
     login: (username: string, password?: string) => Promise<void>;
     getSqliteStats: () => { size: number };
+    spinWheel: () => Promise<{ prize: WheelPrize }>;
+    recordArcadePlay: (score: number) => Promise<void>;
 }
 
 const GameContext = createContext<ExtendedGameState | undefined>(undefined);
@@ -34,7 +35,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [motd, setMotdState] = useState<string>('');
   const [globalModifiers, setGlobalModifiers] = useState<GlobalModifiers>({ xpMultiplier: 1, goldMultiplier: 1 });
   
-  // Settings State
   const [settings, setSettings] = useState<GameSettings>({
       musicVolume: 0.5,
       sfxVolume: 0.8,
@@ -46,7 +46,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const isShiftActive = !!(todayLog && !todayLog.time_out);
 
   useEffect(() => {
-    // Initial Load
     const init = async () => {
       try {
           const u = await gameService.getUserProfile();
@@ -60,7 +59,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setMotdState(gameService.getMotd());
           setGlobalModifiers(gameService.getGlobalModifiers());
 
-          // Load Settings from DB (loaded into gameService during init)
           const dbSettings = gameService.getSettings();
           setSettings(dbSettings);
           audioService.setVolumes(dbSettings.musicVolume, dbSettings.sfxVolume, dbSettings.isMusicMuted, dbSettings.isSfxMuted);
@@ -73,9 +71,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const interval = setInterval(async () => {
         setBossEvent({...gameService.getBossEvent()});
-        
-        // Auto-refresh user profile to catch Admin updates (Bonuses, etc.)
-        // getUserProfile reads from SQLite, which is the source of truth
         if (user) {
             const freshUser = await gameService.getUserProfile();
             if (freshUser) {
@@ -85,7 +80,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [user?.id]); // Dependency on user ID to restart interval if user switches
+  }, [user?.id]); 
 
   useEffect(() => {
       audioService.setVolumes(settings.musicVolume, settings.sfxVolume, settings.isMusicMuted, settings.isSfxMuted);
@@ -109,7 +104,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateSettings = (newSettings: Partial<GameSettings>) => {
       setSettings(prev => {
           const updated = { ...prev, ...newSettings };
-          gameService.saveSettings(updated); // Persist to SQLite
+          gameService.saveSettings(updated); 
           return updated;
       });
   }
@@ -202,7 +197,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const submitQuest = async (questId: string) => {
     try {
       await gameService.submitQuest(questId);
-      refreshGameData(); // To update status to pending
+      refreshGameData();
       addToast('Quest Submitted for Approval', 'info');
       playSfx('button');
     } catch (e: any) {
@@ -210,7 +205,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Replaced direct completion with submit
   const completeQuest = submitQuest;
 
   const approveQuest = async (userId: string, questId: string) => {
@@ -277,15 +271,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const spinWheel = () => {
-      try {
-          const result = gameService.spinWheel();
-          gameService.getUserProfile().then(u => setUser(u));
-          return result;
-      } catch (e: any) {
-          addToast(e.message, 'error');
-          throw e;
-      }
+  const spinWheel = async () => {
+      const result = await gameService.spinWheel();
+      setUser(gameService['user']); // Update local user from service
+      return result;
   };
 
   const unlockSkill = async (skillId: string) => {
@@ -309,8 +298,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
-  const recordArcadePlay = async () => {
-      const u = await gameService.recordArcadePlay();
+  const recordArcadePlay = async (score: number) => {
+      const u = await gameService.recordArcadePlay(score);
       setUser({...u});
   }
 
@@ -344,7 +333,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   }
 
-  // Admin Features
   const exportData = async () => { return await gameService.exportAttendanceCSV(); }
   const toggleBan = async (userId: string) => { await gameService.toggleBan(userId); addToast('User Ban Status Updated', 'info'); }
   const updateUser = async (userId: string, data: Partial<User>) => { await gameService.updateUser(userId, data); addToast('User Profile Updated', 'success'); }

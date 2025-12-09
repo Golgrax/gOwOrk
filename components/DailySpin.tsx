@@ -1,7 +1,9 @@
 
+
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { gameService, WHEEL_PRIZES, WheelPrize } from '../services/gameService';
+import { gameService, WHEEL_PRIZES } from '../services/gameService';
+import { WheelPrize } from '../types';
 import { X, Gift, Heart, Coins, Star, Crown, ChevronDown } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -10,53 +12,49 @@ interface DailySpinProps {
 }
 
 export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
-  const { spinWheel, playSfx } = useGame();
+  const { spinWheel, playSfx, addToast } = useGame();
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<WheelPrize | null>(null);
 
   const SEGMENT_ANGLE = 360 / WHEEL_PRIZES.length;
 
-  const handleSpin = () => {
+  const handleSpin = async () => {
     if (spinning) return;
     setSpinning(true);
     playSfx('button');
 
-    // 1. Get the result immediately from logic
-    const outcome = spinWheel(); // Returns { prizeId, ... }
-    const prizeIndex = WHEEL_PRIZES.findIndex(p => p.id === outcome.prizeId);
-    
-    // 2. Calculate mapped target angle
-    // Logic: The wheel container rotates. We want the center of the selected segment to align with the Top Pointer (0 deg).
-    // Segment 0 center is at Angle/2.
-    // To bring Angle/2 to 0, we rotate by -Angle/2.
-    
-    const segmentCenter = (prizeIndex * SEGMENT_ANGLE) + (SEGMENT_ANGLE / 2);
-    const targetBase = -segmentCenter; 
-    
-    // Add multiple full spins (ensure it spins enough)
-    const fullSpins = 360 * 8; 
-    
-    // Add a tiny jitter (+/- 2 deg) so it doesn't look robotic
-    const jitter = (Math.random() * 4) - 2;
+    try {
+        // 1. Get the result from SERVER
+        const outcome = await spinWheel(); 
+        const prizeIndex = WHEEL_PRIZES.findIndex(p => p.id === outcome.prize.id);
+        
+        // 2. Calculate animation
+        const segmentCenter = (prizeIndex * SEGMENT_ANGLE) + (SEGMENT_ANGLE / 2);
+        const targetBase = -segmentCenter; 
+        const fullSpins = 360 * 8; 
+        const jitter = (Math.random() * 4) - 2;
+        const finalRotation = targetBase - fullSpins + jitter;
 
-    const finalRotation = targetBase - fullSpins + jitter;
+        // 3. Animate
+        setRotation(finalRotation);
 
-    // 3. Animate
-    setRotation(finalRotation);
-
-    // 4. Wait for animation
-    setTimeout(() => {
-        setResult(WHEEL_PRIZES[prizeIndex]);
+        // 4. Wait for animation
+        setTimeout(() => {
+            setResult(outcome.prize);
+            setSpinning(false);
+            playSfx('success');
+            confetti({
+                particleCount: 200,
+                spread: 100,
+                origin: { y: 0.5 },
+                colors: [outcome.prize.color, '#ffffff']
+            });
+        }, 4000); 
+    } catch (e: any) {
+        addToast(e.message, 'error');
         setSpinning(false);
-        playSfx('success');
-        confetti({
-             particleCount: 200,
-             spread: 100,
-             origin: { y: 0.5 },
-             colors: [WHEEL_PRIZES[prizeIndex].color, '#ffffff']
-        });
-    }, 4000); // 4s matches CSS transition duration
+    }
   };
 
   const canSpin = gameService.canSpin();
@@ -68,7 +66,6 @@ export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
       return <Crown size={20} />;
   }
 
-  // Create Conic Gradient for background
   const gradient = `conic-gradient(${
       WHEEL_PRIZES.map((p, i) => {
           const start = i * (100 / WHEEL_PRIZES.length);
@@ -93,12 +90,10 @@ export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
             )}
 
             <div className="relative w-72 h-72 mx-auto my-6">
-                {/* Pointer */}
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 text-black drop-shadow-xl filter">
                     <ChevronDown size={64} fill="black" strokeWidth={3} className="text-white" />
                 </div>
 
-                {/* Wheel Container */}
                 <div 
                     className="w-full h-full rounded-full border-4 border-black relative overflow-hidden shadow-xl"
                     style={{ 
@@ -107,13 +102,11 @@ export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
                         transition: spinning ? 'transform 4s cubic-bezier(0.1, 0, 0.2, 1)' : 'none'
                     }}
                 >
-                    {/* Segments Text */}
                     {WHEEL_PRIZES.map((prize, i) => (
                         <div 
                             key={prize.id}
                             className="absolute top-1/2 left-1/2 w-full h-0 -translate-y-1/2 origin-left flex items-center"
                             style={{ 
-                                // Subtract 90deg to align text (Right 3 o'clock) with Slice Center (Top 12 o'clock)
                                 transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE/2) - 90}deg)` 
                             }}
                         >
@@ -127,7 +120,6 @@ export const DailySpin: React.FC<DailySpinProps> = ({ onClose }) => {
                         </div>
                     ))}
                     
-                    {/* Inner Circle (Hub) */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white border-4 border-black rounded-full z-10 flex items-center justify-center">
                         <div className="w-3 h-3 bg-black rounded-full"></div>
                     </div>

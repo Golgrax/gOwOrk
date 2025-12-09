@@ -1,7 +1,7 @@
 
-import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings } from '../types';
 
-// Constants kept for UI reference, logic moved to server
+import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
+
 const SHOP_ITEMS: ShopItem[] = [
   { id: 'item_cap_red', name: 'Red Cap', type: 'hat', asset_id: 'cap_red', cost: 50, description: 'Classic pizza delivery vibes.' },
   { id: 'item_cap_blue', name: 'Blue Cap', type: 'hat', asset_id: 'cap_blue', cost: 50, description: 'Cool and collected.' },
@@ -39,15 +39,6 @@ const INITIAL_BOSS: BossEvent = {
   description: "An endless horde of caffeine-deprived zombies."
 };
 
-export interface WheelPrize {
-    id: string;
-    label: string;
-    type: 'gold' | 'xp' | 'hp';
-    value: number;
-    weight: number; 
-    color: string;
-}
-
 export const WHEEL_PRIZES: WheelPrize[] = [
     { id: 'p1', label: '50 Gold', type: 'gold', value: 50, weight: 30, color: '#FFD700' },
     { id: 'p2', label: '50 XP', type: 'xp', value: 50, weight: 30, color: '#3B82F6' }, 
@@ -67,11 +58,8 @@ class GameService {
   private globalModifiers: GlobalModifiers = { xpMultiplier: 1, goldMultiplier: 1 };
   private settings: GameSettings = { musicVolume: 0.5, sfxVolume: 0.8, isMusicMuted: true, isSfxMuted: false, lowPerformanceMode: false };
 
-  constructor() {
-    // API based now
-  }
+  constructor() {}
 
-  // --- API HELPER ---
   private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
       const headers = { 'Content-Type': 'application/json' };
       try {
@@ -81,14 +69,12 @@ class GameService {
               body: body ? JSON.stringify(body) : undefined
           });
 
-          // Guard: Check if response is actually JSON (handles 404/500 HTML responses)
           const contentType = res.headers.get("content-type");
           if (contentType && contentType.indexOf("application/json") !== -1) {
               const data = await res.json();
               if (!res.ok) throw new Error(data.error || `Error ${res.status}: ${res.statusText}`);
               return data;
           } else {
-              // Received non-JSON response (likely 404 from Vite proxy failure)
               throw new Error("Server Unreachable. Please ensure the backend (node server.js) is running.");
           }
       } catch (e: any) {
@@ -105,7 +91,6 @@ class GameService {
   }
 
   async register(username: string, password?: string): Promise<User> {
-      // Hash handled on server or ideally basic hash here for transport
       const hash = password ? await this.hashPassword(password) : '';
       const user = await this.apiCall('/auth/register', 'POST', { 
           id: crypto.randomUUID(),
@@ -139,7 +124,6 @@ class GameService {
       } catch(e) { return null; }
   }
 
-  // --- DATA SYNC ---
   async refreshData() {
       const data = await this.apiCall('/data/refresh');
       this.bossEvent = data.bossEvent;
@@ -149,7 +133,6 @@ class GameService {
       return data;
   }
 
-  // --- ACTIONS ---
   async clockIn(date: Date, isOverdrive: boolean): Promise<AttendanceLog> {
       if (!this.user) throw new Error("No User");
       const log = await this.apiCall('/action/clock-in', 'POST', {
@@ -171,7 +154,6 @@ class GameService {
   }
 
   async getTodayLog(dateOverride?: Date): Promise<AttendanceLog | undefined> {
-      // For MVP, we can just assume clockIn check handles it or client stores it in state.
       return undefined; 
   }
 
@@ -183,7 +165,6 @@ class GameService {
   }
 
   async takeBreak() {
-      // Simpler client logic for break since it's just HP
       if (!this.user) throw new Error("No User");
       this.user.current_hp = Math.min(this.user.total_hp, this.user.current_hp + 15);
       return { user: this.user, recovered: 15 };
@@ -196,9 +177,7 @@ class GameService {
       return res;
   }
 
-  // --- QUESTS ---
   async getQuests() {
-      // Getting from /data/refresh usually
       const data = await this.refreshData();
       return { active: data.activeQuests, userStatus: {}, nextRefresh: Date.now() + 3600000 };
   }
@@ -208,7 +187,6 @@ class GameService {
   }
 
   async submitQuest(questId: string) {
-      // Stub for now, would need endpoint
       return { user: this.user!, status: 'pending' };
   }
 
@@ -224,41 +202,25 @@ class GameService {
       // Stub
   }
 
-  // --- MISC ---
-  spinWheel() {
-      // Client-side visual logic mostly, but we should sync the reward.
-      // For prototype speed, we'll keep the logic client side but really should be server.
+  // --- MINIGAMES ---
+  
+  async spinWheel(): Promise<{ prize: WheelPrize }> {
       if (!this.user) throw new Error("No User");
-      
-      const totalWeight = WHEEL_PRIZES.reduce((sum, p) => sum + p.weight, 0);
-      let r = Math.random() * totalWeight;
-      let selectedPrize = WHEEL_PRIZES[0];
-
-      for (const prize of WHEEL_PRIZES) {
-          if (r < prize.weight) {
-              selectedPrize = prize;
-              break;
-          }
-          r -= prize.weight;
-      }
-
-      // Sync reward logic manually since we didn't add endpoint for spin
-      if (selectedPrize.type === 'gold') this.user.current_gold += selectedPrize.value;
-      if (selectedPrize.type === 'xp') this.user.current_xp += selectedPrize.value;
-      if (selectedPrize.type === 'hp') this.user.current_hp = this.user.total_hp;
-      this.user.last_spin_date = new Date().toISOString().split('T')[0];
-      
-      return { 
-          reward: `+${selectedPrize.value}`, 
-          value: selectedPrize.value, 
-          type: selectedPrize.type, 
-          prizeId: selectedPrize.id 
-      };
+      const res = await this.apiCall('/action/spin', 'POST', { userId: this.user.id });
+      this.user = res.user;
+      return { prize: res.prize };
   }
   
   canSpin() {
       if (!this.user) return false;
       return this.user.last_spin_date !== new Date().toISOString().split('T')[0];
+  }
+
+  async recordArcadePlay(score: number) {
+      if (!this.user) return this.user;
+      const res = await this.apiCall('/action/arcade', 'POST', { userId: this.user.id, score });
+      this.user = res.user;
+      return this.user;
   }
 
   // Getters
@@ -270,9 +232,9 @@ class GameService {
   getMotd() { return this.motd; }
   getGlobalModifiers() { return this.globalModifiers; }
   getSettings() { return this.settings; }
-  getSqliteStats() { return { size: 0 }; } // Deprecated
+  getSqliteStats() { return { size: 0 }; } 
 
-  // Stubs for other methods to keep TypeScript happy
+  // Stubs
   async getLeaderboard() { return (await this.refreshData()).leaderboard; }
   async getTeamData() { 
       const l = await this.getLeaderboard();
@@ -294,7 +256,6 @@ class GameService {
   async unlockSkill(s: string) { return this.user!; }
   async sendKudos(t: string) { return "Kudos sent!"; }
   async feedPet() { return { user: this.user!, msg: "Fed!" }; }
-  async recordArcadePlay() { return this.user!; }
   async exportAttendanceCSV() { return ""; }
   async adminPunish(uid: string, t: any, a: number) { /* Stub */ }
   async toggleBan(uid: string) { /* Stub */ }

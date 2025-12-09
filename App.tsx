@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import { GameScene } from './components/GameScene';
@@ -25,7 +24,7 @@ import { Home, ShoppingBag, User as UserIcon, ClipboardList, LogOut, CloudRain, 
 import confetti from 'canvas-confetti';
 
 const GameLayout: React.FC = () => {
-  const { user, isOverdrive, logout, weather, addGold, addXp, addToast, isShiftActive, recordArcadePlay, playSfx, settings } = useGame();
+  const { user, isOverdrive, logout, weather, addToast, isShiftActive, recordArcadePlay, playSfx } = useGame();
   const [currentView, setCurrentView] = useState<'home' | 'shop' | 'profile' | 'admin' | 'skills' | 'security'>('home');
   const [showArcade, setShowArcade] = useState(false);
   const [showDailySpin, setShowDailySpin] = useState(false);
@@ -34,23 +33,17 @@ const GameLayout: React.FC = () => {
 
   if (!user) return <LoginScreen />;
 
-  const handleArcadeReward = (score: number) => {
-      const goldEarned = Math.floor(score / 10);
-      const xpEarned = Math.floor(score / 5);
-      
-      if (goldEarned > 0) {
-          addGold(goldEarned);
-          addXp(xpEarned);
-          recordArcadePlay(); // Start cooldown
-          addToast(`Arcade Payout: +${goldEarned}G +${xpEarned}XP`, 'success');
+  const handleArcadeReward = async (score: number) => {
+      try {
+          await recordArcadePlay(score); // Server handles calculation
+          addToast(`Arcade Score: ${score}! Rewards Added.`, 'success');
           confetti({
              particleCount: 150,
              spread: 80,
              origin: { y: 0.6 }
           });
-      } else {
-          addToast(`No points, no prize! Try again later.`, 'error');
-          recordArcadePlay(); // Still start cooldown
+      } catch (e: any) {
+          addToast(e.message, 'error');
       }
       setShowArcade(false);
   };
@@ -80,7 +73,6 @@ const GameLayout: React.FC = () => {
               </div>
               <ActionPad onOpenArcade={() => setShowArcade(true)} />
               
-              {/* Daily Spin Button */}
               <button 
                 onClick={handleOpenSpin}
                 disabled={!isShiftActive}
@@ -109,14 +101,12 @@ const GameLayout: React.FC = () => {
   return (
     <div className="relative h-screen w-full overflow-hidden text-gray-900 font-vt323">
       
-      {/* 3D World Background */}
       <GameScene 
           config={user.avatar_json} 
           hpPercent={Math.round((user.current_hp / user.total_hp) * 100)} 
           isOverdrive={isOverdrive}
       />
 
-      {/* Cinematic & Settings Toggles */}
       <div className="fixed top-24 right-4 z-50 flex flex-col gap-2">
           <button 
             onClick={() => setUiVisible(!uiVisible)}
@@ -135,7 +125,6 @@ const GameLayout: React.FC = () => {
           </button>
       </div>
 
-      {/* Weather Indicator (Overlay) - Moved to top-40 to avoid MOTD overlap */}
       <div className={`absolute top-40 left-4 z-0 pointer-events-none transition-opacity duration-500 ${uiVisible ? 'opacity-80' : 'opacity-0'}`}>
           <div className="flex items-center gap-2 bg-black/50 text-white p-2 rounded backdrop-blur-sm border-2 border-white/20">
              <WeatherIcon />
@@ -143,7 +132,6 @@ const GameLayout: React.FC = () => {
           </div>
       </div>
 
-      {/* Modals */}
       {showArcade && (
           <BonusGame 
             onClose={() => setShowArcade(false)} 
@@ -153,7 +141,6 @@ const GameLayout: React.FC = () => {
       {showDailySpin && <DailySpin onClose={() => setShowDailySpin(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
-      {/* Main UI Overlay - Toggled Visibility */}
       <div className={`absolute inset-0 z-10 flex flex-col pointer-events-none transition-opacity duration-500 ${uiVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="pointer-events-auto">
             <Header />
@@ -161,13 +148,11 @@ const GameLayout: React.FC = () => {
         <ToastContainer />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide pointer-events-auto">
-           {/* Width Logic Update: If Security View, use near full-width. Else use standard max-w-2xl */}
            <div className={`${currentView === 'security' ? 'w-full max-w-[98vw]' : 'max-w-2xl'} mx-auto pb-24 transition-all duration-300`}>
               {renderView()}
            </div>
         </main>
 
-        {/* Bottom Navigation */}
         <nav className="bg-white border-t-4 border-black p-2 flex justify-around items-center pixel-shadow pb-safe pointer-events-auto overflow-x-auto">
            <NavButton 
               icon={<Home />} 
@@ -219,7 +204,6 @@ const GameLayout: React.FC = () => {
         </nav>
       </div>
 
-      {/* Restrict Overdrive Toggle to Managers */}
       {user.role === 'manager' && (
           <div className={`pointer-events-auto transition-opacity duration-500 ${uiVisible ? 'opacity-100' : 'opacity-0'}`}>
              <OverdriveToggle />

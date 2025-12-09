@@ -153,6 +153,15 @@ export interface GameSettings {
     lowPerformanceMode: boolean;
 }
 
+export interface WheelPrize {
+    id: string;
+    label: string;
+    type: 'gold' | 'xp' | 'hp';
+    value: number;
+    weight: number; 
+    color: string;
+}
+
 export interface GameState {
   user: User | null;
   activeQuests: Quest[];

@@ -94,7 +94,7 @@ const schema = `
 `;
 db.exec(schema);
 
-// --- SHARED CONSTANTS (Mirrored from Frontend) ---
+// --- SHARED CONSTANTS ---
 const SKILL_TREE = [
     { id: 'skill_barista_mastery', effectType: 'gold_boost', effectValue: 0.2 },
     { id: 'skill_iron_lungs', effectType: 'max_hp_boost', effectValue: 20 },
@@ -114,6 +114,17 @@ const SHOP_ITEMS = [
     { id: 'cons_coffee', cost: 15, type: 'consumable', effectValue: 20 },
     { id: 'cons_donut', cost: 25, type: 'consumable', effectValue: 40 },
     { id: 'cons_energy', cost: 50, type: 'consumable', effectValue: 100 },
+];
+
+const WHEEL_PRIZES = [
+    { id: 'p1', label: '50 Gold', type: 'gold', value: 50, weight: 30 },
+    { id: 'p2', label: '50 XP', type: 'xp', value: 50, weight: 30 },
+    { id: 'p3', label: '10 Gold', type: 'gold', value: 10, weight: 10 },
+    { id: 'p4', label: 'Full Heal', type: 'hp', value: 100, weight: 10 },
+    { id: 'p5', label: '100 Gold', type: 'gold', value: 100, weight: 10 },
+    { id: 'p6', label: '100 XP', type: 'xp', value: 100, weight: 10 },
+    { id: 'p7', label: '10 XP', type: 'xp', value: 10, weight: 10 },
+    { id: 'p8', label: 'JACKPOT', type: 'gold', value: 500, weight: 1 },
 ];
 
 const INITIAL_BOSS = {
@@ -180,6 +191,17 @@ function getSkillMultiplier(user, type) {
     return multiplier;
 }
 
+function checkLevelUp(user) {
+    if (user.current_xp >= user.level * 100) {
+        user.current_xp -= user.level * 100;
+        user.level++;
+        user.skill_points++;
+        user.total_hp += 10;
+        return true;
+    }
+    return false;
+}
+
 function damageBoss(amt) {
     let boss = JSON.parse(db.prepare("SELECT value FROM game_globals WHERE key = 'boss'").get()?.value || JSON.stringify(INITIAL_BOSS));
     if (boss.isActive) {
@@ -197,10 +219,6 @@ app.post('/api/auth/login', async (req, res) => {
     const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!row) return res.status(404).json({ error: "User not found" });
     if (row.is_banned) return res.status(403).json({ error: "Banned" });
-    
-    // In a real app, verify hash. For prototype, we assume logic handled client or simple equality if needed.
-    // We'll trust the GameService sent password logic for now or implement simple check if needed.
-    // For this migration, we send back the user.
     res.json(mapUser(row));
 });
 
@@ -246,22 +264,19 @@ app.get('/api/data/refresh', (req, res) => {
 
 // Actions
 app.post('/api/action/clock-in', (req, res) => {
-    const { userId, date, isOverdrive } = req.body; // date is ISO string
+    const { userId, date, isOverdrive } = req.body;
     const user = getUser(userId);
     if (!user) return res.status(404).send();
 
     const d = new Date(date);
     const todayStr = d.toISOString().split('T')[0];
     
-    // Check existing
     const existing = db.prepare('SELECT * FROM attendance_logs WHERE user_id = ? AND date = ?').get(userId, todayStr);
     if (existing) return res.json(existing);
 
-    // Logic
     const hour = d.getHours();
     const minute = d.getMinutes();
     
-    // Streak
     if (user.last_login_date !== todayStr) {
         const lastLogin = new Date(user.last_login_date || 0);
         const diffDays = Math.ceil(Math.abs(d.getTime() - lastLogin.getTime()) / (86400000));
@@ -284,14 +299,7 @@ app.post('/api/action/clock-in', (req, res) => {
     user.current_xp += xp;
     user.current_hp = Math.max(0, user.current_hp + hpChange);
     
-    // Level Up Check
-    if (user.current_xp >= user.level * 100) {
-        user.current_xp -= user.level * 100;
-        user.level++;
-        user.skill_points++;
-        user.total_hp += 10;
-    }
-
+    checkLevelUp(user);
     saveUser(user);
 
     const logId = Date.now().toString();
@@ -318,7 +326,7 @@ app.post('/api/action/work', (req, res) => {
     const weather = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get()?.value || 'Sunny';
     let cost = (weather === 'Snowy') ? 5 : 2;
 
-    if (user.current_hp < cost) return res.status(400).json({ error: "Too tired" });
+    if (user.current_hp < cost) return res.status(400).json({ error: "You are too tired! Take a break." });
 
     user.current_hp -= cost;
     
@@ -332,17 +340,73 @@ app.post('/api/action/work', (req, res) => {
     user.current_gold += gold;
     user.current_xp += xp;
 
-    // Level Up Check
-    if (user.current_xp >= user.level * 100) {
-        user.current_xp -= user.level * 100;
-        user.level++;
-        user.skill_points++;
-        user.total_hp += 10;
-    }
-
+    checkLevelUp(user);
     damageBoss(1);
     saveUser(user);
     res.json({ user, earned: `+${gold}G +${xp}XP` });
+});
+
+app.post('/api/action/spin', (req, res) => {
+    const { userId } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (user.last_spin_date === todayStr) {
+        return res.status(400).json({ error: "You already spun today!" });
+    }
+
+    const totalWeight = WHEEL_PRIZES.reduce((sum, p) => sum + p.weight, 0);
+    let r = Math.random() * totalWeight;
+    let selectedPrize = WHEEL_PRIZES[0];
+
+    for (const prize of WHEEL_PRIZES) {
+        if (r < prize.weight) {
+            selectedPrize = prize;
+            break;
+        }
+        r -= prize.weight;
+    }
+
+    if (selectedPrize.type === 'gold') user.current_gold += selectedPrize.value;
+    if (selectedPrize.type === 'xp') user.current_xp += selectedPrize.value;
+    if (selectedPrize.type === 'hp') user.current_hp = user.total_hp;
+
+    user.last_spin_date = todayStr;
+    checkLevelUp(user);
+    saveUser(user);
+    logAction(userId, 'SPIN', `Won ${selectedPrize.label}`);
+
+    res.json({ 
+        user, 
+        prize: selectedPrize
+    });
+});
+
+app.post('/api/action/arcade', (req, res) => {
+    const { userId, score } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+
+    // Check Cooldown
+    const COOLDOWN_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+    if (user.last_arcade_play_time && (now - user.last_arcade_play_time < COOLDOWN_MS)) {
+        return res.status(400).json({ error: "Arcade is cooling down!" });
+    }
+
+    const goldEarned = Math.floor(score / 10);
+    const xpEarned = Math.floor(score / 5);
+
+    user.current_gold += goldEarned;
+    user.current_xp += xpEarned;
+    user.last_arcade_play_time = now;
+
+    checkLevelUp(user);
+    saveUser(user);
+    logAction(userId, 'ARCADE', `Score: ${score} (+${goldEarned}G)`);
+
+    res.json({ user, goldEarned, xpEarned });
 });
 
 app.post('/api/shop/buy', (req, res) => {
@@ -415,7 +479,6 @@ app.post('/api/admin/approve-quest', (req, res) => {
     res.json({ success: true });
 });
 
-// Fallback for SPA
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
