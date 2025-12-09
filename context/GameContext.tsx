@@ -242,7 +242,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const buyItem = async (itemId: string) => {
       try {
           const { user: u, message } = await gameService.buyItem(itemId);
-          setUser({...u});
+          setUser({...u} as User);
           addToast(message, 'success');
           playSfx('coin');
       } catch (e: any) {
@@ -254,7 +254,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const equipItem = async (type: keyof AvatarConfig, assetId: string) => {
       const u = await gameService.equipItem(type, assetId);
-      if(u) { setUser({...u}); addToast('Item Equipped!', 'info'); }
+      if(u) { setUser({...u} as User); addToast('Item Equipped!', 'info'); }
   };
 
   const createQuest = async (quest: Omit<Quest, 'id' | 'expiresAt'>, durationHours: number) => {
@@ -271,7 +271,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const performWorkAction = async () => {
       try {
           const { user: u, earned } = await gameService.performWorkAction();
-          setUser(u);
+          setUser(u as User);
           addToast(earned, 'success');
           playSfx('coin');
       } catch (e: any) {
@@ -282,7 +282,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const takeBreak = async () => {
       try {
           const { user: u, recovered, message } = await gameService.takeBreak();
-          setUser(u);
+          setUser(u as User);
           addToast(message || `Rested: +${recovered} HP`, 'info');
       } catch (e: any) {
           addToast(e.message, 'error');
@@ -291,14 +291,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const spinWheel = async () => {
       const result = await gameService.spinWheel();
-      setUser(gameService['user']); // Update local user from service
+      // TypeScript safety cast since accessing private/internal via any
+      setUser(gameService['user'] as User); 
       return result;
   };
 
   const unlockSkill = async (skillId: string) => {
       try {
           const u = await gameService.unlockSkill(skillId);
-          setUser({...u});
+          setUser({...u} as User);
           addToast('Skill Unlocked!', 'success');
           playSfx('success');
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
@@ -318,13 +319,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const recordArcadePlay = async (score: number) => {
       const u = await gameService.recordArcadePlay(score);
-      setUser({...u});
+      setUser({...u} as User);
   }
 
   const feedPet = async () => {
       try {
           const { user: u, msg } = await gameService.feedPet();
-          setUser({...u});
+          setUser({...u} as User);
           addToast(msg, 'success');
           confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 }, colors: ['#FF69B4', '#FFF'] });
       } catch(e: any) {

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { AvatarConfig, WeatherType, Pet } from '../types';
+import { AvatarConfig } from '../types';
 import { useGame } from '../context/GameContext';
 
 interface GameSceneProps {
@@ -286,7 +286,6 @@ export const GameScene: React.FC<GameSceneProps> = ({ config, hpPercent, isOverd
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameId);
       if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
-      renderer.geometry?.dispose();
       renderer.dispose();
     };
   }, [configKey, hpPercent, isOverdrive, weather, petKey]); 
