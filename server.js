@@ -179,13 +179,14 @@ function logAction(userId, type, details) {
     const RED = '\x1b[31m';    // Admin
     const GREEN = '\x1b[32m';  // Quest/Gain
     const YELLOW = '\x1b[33m'; // Shop/Gold
+    const PURPLE = '\x1b[35m'; // Level Up
     const DIM = '\x1b[2m';
 
     let color = RESET;
     if (type === 'SYSTEM') color = CYAN;
     if (type === 'ADMIN') color = RED;
     if (type === 'SHOP' || type === 'SPIN') color = YELLOW;
-    if (type === 'QUEST' || type === 'SKILL') color = GREEN;
+    if (type === 'QUEST' || type === 'SKILL' || type === 'WORK') color = GREEN;
 
     console.log(`${DIM}[${timeStr}]${RESET} ${color}[${type}]${RESET} <${username}> ${details}`);
 }
@@ -501,8 +502,8 @@ app.post('/api/action/work', (req, res) => {
     damageBoss(1);
     saveUser(user);
     
-    // Removed overly verbose work logs to prevent terminal spam
-    // logAction(userId, 'WORK', `Worked ${bonusMessage}`); 
+    // Force logs to terminal
+    console.log(`\x1b[32m[WORK]\x1b[0m ${user.username} worked. Earned: ${gold}G ${xp}XP ${bonusMessage}`);
     
     res.json({ user, earned: `+${gold}G +${xp}XP${bonusMessage}` });
 });
@@ -525,7 +526,8 @@ app.post('/api/action/take-break', (req, res) => {
 
     user.current_hp = Math.min(user.total_hp, user.current_hp + recoverAmount);
     saveUser(user);
-    // logAction(userId, 'BREAK', `Rested (+${recoverAmount}HP)`);
+    
+    console.log(`\x1b[36m[BREAK]\x1b[0m ${user.username} rested. +${recoverAmount}HP`);
 
     res.json({ user, recovered: recoverAmount, message: `Rested: +${recoverAmount} HP${msg}` });
 });
@@ -735,6 +737,19 @@ app.post('/api/admin/approve-quest', (req, res) => {
         logAction(userId, 'ADMIN', `Approved Quest ${qRow.title}`);
     }
     res.json({ success: true });
+});
+
+app.post('/api/admin/give-bonus', (req, res) => {
+    const { userId, amount } = req.body;
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    if(user) {
+        db.prepare('UPDATE users SET current_gold = current_gold + ? WHERE id = ?').run(amount, userId);
+        logAction(userId, 'ADMIN', `Bonus Granted: ${amount}G`);
+        console.log(`\x1b[31m[ADMIN]\x1b[0m Bonus of ${amount}G sent to ${user.username || userId}`);
+        res.json({ success: true });
+    } else {
+        res.status(404).json({error: "User not found"});
+    }
 });
 
 // --- NEW ADMIN ENDPOINTS ---

@@ -293,6 +293,10 @@ class GameService {
       this.isAutoWeather = enabled;
   }
 
+  async giveBonus(userId: string, amount: number) {
+      await this.apiCall('/admin/give-bonus', 'POST', { userId, amount });
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -307,7 +311,6 @@ class GameService {
 
   // Stubs
   async getLeaderboard() { return (await this.refreshData()).leaderboard; }
-  async giveBonus(uid: string, amt: number) { /* Stub */ }
   setWeather(w: WeatherType) { this.weather = w; }
   setMotd(m: string) { this.motd = m; }
   saveSettings(s: GameSettings) { this.settings = s; }
