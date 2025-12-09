@@ -6,12 +6,14 @@ import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DB_PATH = process.env.DB_PATH || 'gowork.db';
 
 // Middleware
 app.use(cors());
@@ -19,7 +21,13 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- DATABASE SETUP ---
-const db = new Database('gowork.db');
+// Ensure directory exists if using a custom path
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 // Migrations
@@ -974,8 +982,21 @@ app.delete('/api/admin/user/:id', (req, res) => {
     res.json({ success: true });
 });
 
+// Fallback for SPA
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        // If dist folder is missing (deployment error), don't crash the server.
+        // Send a helpful 404 message instead of letting Express error out.
+        res.status(404).send(`
+            <h1>Application Build Not Found</h1>
+            <p>The <code>dist/index.html</code> file is missing.</p>
+            <p><strong>Deployment Fix:</strong> Ensure your Build Command is set to: <code>npm install && npm run build</code></p>
+            <p>And your Start Command is set to: <code>npm start</code></p>
+        `);
+    }
 });
 
 app.listen(PORT, () => {

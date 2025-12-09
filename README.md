@@ -1,3 +1,4 @@
+
 # gOwOrk 🛡️☕
 
 **gOwOrk** is a Gamified Attendance and Employee Engagement System designed for shift-based workplaces. It turns the mundane task of "Clocking In" into an RPG adventure, featuring a 3D voxel avatar, economy system, skill trees, and arcade minigames.
@@ -10,11 +11,13 @@
 *   **3D Engine**: Three.js
 *   **Icons**: Lucide React
 *   **Effects**: Canvas Confetti
+*   **Backend**: Node.js (Express)
+*   **Database**: SQLite (better-sqlite3)
 
 ## 🛠️ Installation & Setup
 
 ### 1. Prerequisites
-Ensure you have [Node.js](https://nodejs.org/) installed (v16+ recommended).
+Ensure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
 
 ### 2. Install Dependencies
 Open your terminal in the project folder and run:
@@ -24,7 +27,7 @@ npm install
 ```
 
 ### 3. Run the App
-Start the development server:
+Start the development server (runs both backend and frontend):
 
 ```bash
 npm run dev
@@ -36,7 +39,17 @@ To create a production-ready build:
 
 ```bash
 npm run build
+npm start
 ```
+
+## ☁️ Deployment (Render)
+
+When deploying to Render.com, ensure you use the following settings:
+
+*   **Build Command**: `npm install && npm run build`
+*   **Start Command**: `npm start`
+
+*Note: Data persistence on the free tier of Render is ephemeral. The SQLite database file will reset on every redeploy unless you attach a persistent disk and set `DB_PATH`.*
 
 ## 🎮 Gameplay Guide
 
@@ -70,8 +83,8 @@ npm run build
 *   **Kudos**: Send a "High Five" to teammates on the leaderboard to give them a small XP boost.
 
 ## ⌨️ Developer Notes
-*   **Persistence**: The app currently uses `localStorage` to save user progress, inventory, and game state. Clearing browser cache will reset progress.
-*   **Mock Data**: The backend logic (`gameService.ts`) simulates server calls with artificial delays.
+*   **Persistence**: Uses SQLite for user data and logs.
+*   **Mock Data**: The backend logic (`server.js`) simulates server calls with artificial delays.
 
 ---
 *Built for the Modern Worker.*
