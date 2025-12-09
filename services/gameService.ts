@@ -186,7 +186,9 @@ class GameService {
   }
 
   async submitQuest(questId: string) {
-      return { user: this.user!, status: 'pending' };
+      if (!this.user) throw new Error("No User");
+      await this.apiCall('/action/submit-quest', 'POST', { userId: this.user.id, questId });
+      return { user: this.user, status: 'pending' };
   }
 
   async getPendingSubmissions(): Promise<QuestSubmission[]> {
@@ -262,6 +264,10 @@ class GameService {
       await this.apiCall('/admin/punish', 'POST', { userId, type, amount });
   }
 
+  async getAuditLogs(): Promise<AuditLog[]> {
+      return await this.apiCall('/admin/audit-logs');
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -292,7 +298,6 @@ class GameService {
   setMotd(m: string) { this.motd = m; }
   saveSettings(s: GameSettings) { this.settings = s; }
   async exportAttendanceCSV() { return ""; }
-  async getAuditLogs() { return []; }
   resetGameData() { /* Stub */ }
 }
 

@@ -252,6 +252,7 @@ app.get('/api/data/refresh', (req, res) => {
     const motdRow = db.prepare("SELECT value FROM game_globals WHERE key = 'motd'").get();
     const globalModsRow = db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get();
     
+    // Also include user quest status if needed, but for leaderboard we just send users
     res.json({
         leaderboard: users,
         activeQuests: quests,
@@ -306,6 +307,7 @@ app.post('/api/action/clock-in', (req, res) => {
     db.prepare('INSERT INTO attendance_logs (id, user_id, date, time_in, status, xp_earned) VALUES (?, ?, ?, ?, ?, ?)')
       .run(logId, userId, todayStr, date, status, xp);
 
+    logAction(userId, 'SYSTEM', `Clocked In (${status})`);
     res.json({ id: logId, user_id: userId, date: todayStr, time_in: date, status, xp_earned: xp });
 });
 
@@ -315,6 +317,7 @@ app.post('/api/action/clock-out', (req, res) => {
     db.prepare('UPDATE attendance_logs SET time_out = ? WHERE user_id = ? AND date = ?')
       .run(date, userId, todayStr);
     const log = db.prepare('SELECT * FROM attendance_logs WHERE user_id = ? AND date = ?').get(userId, todayStr);
+    logAction(userId, 'SYSTEM', 'Clocked Out');
     res.json(log);
 });
 
@@ -343,7 +346,22 @@ app.post('/api/action/work', (req, res) => {
     checkLevelUp(user);
     damageBoss(1);
     saveUser(user);
+    // Work is frequent, maybe don't log every click to audit logs to avoid spam, 
+    // or log only significant milestones.
     res.json({ user, earned: `+${gold}G +${xp}XP` });
+});
+
+app.post('/api/action/submit-quest', (req, res) => {
+    const { userId, questId } = req.body;
+    const existing = db.prepare('SELECT * FROM completed_quests WHERE user_id = ? AND quest_id = ?').get(userId, questId);
+    if (existing) return res.status(400).json({ error: "Already submitted" });
+
+    db.prepare('INSERT INTO completed_quests (user_id, quest_id, status) VALUES (?, ?, ?)')
+      .run(userId, questId, 'pending');
+    
+    const quest = db.prepare('SELECT title FROM active_quests WHERE id = ?').get(questId);
+    logAction(userId, 'QUEST', `Submitted: ${quest ? quest.title : questId}`);
+    res.json({ success: true });
 });
 
 app.post('/api/action/spin', (req, res) => {
@@ -540,6 +558,17 @@ app.post('/api/admin/approve-quest', (req, res) => {
 });
 
 // --- NEW ADMIN ENDPOINTS ---
+
+app.get('/api/admin/audit-logs', (req, res) => {
+    const logs = db.prepare(`
+        SELECT a.*, u.name as user_name 
+        FROM audit_logs a 
+        LEFT JOIN users u ON a.user_id = u.id 
+        ORDER BY timestamp DESC 
+        LIMIT 100
+    `).all();
+    res.json(logs);
+});
 
 app.post('/api/admin/update-user', (req, res) => {
     const { userId, name, role } = req.body;
