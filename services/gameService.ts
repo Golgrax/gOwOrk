@@ -1,5 +1,4 @@
 
-
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -223,6 +222,46 @@ class GameService {
       return this.user;
   }
 
+  async equipItem(type: keyof AvatarConfig, assetId: string) {
+      if (!this.user) return null;
+      const u = await this.apiCall('/action/equip', 'POST', { userId: this.user.id, type, assetId });
+      this.user = u;
+      return u;
+  }
+
+  async unlockSkill(skillId: string) {
+      if (!this.user) throw new Error("No User");
+      const u = await this.apiCall('/action/unlock-skill', 'POST', { userId: this.user.id, skillId });
+      this.user = u;
+      return u;
+  }
+
+  async sendKudos(targetUserId: string) {
+      if (!this.user) throw new Error("No User");
+      const res = await this.apiCall('/action/kudos', 'POST', { fromId: this.user.id, toId: targetUserId });
+      return res.message;
+  }
+
+  async feedPet() {
+      if (!this.user) throw new Error("No User");
+      const res = await this.apiCall('/action/feed-pet', 'POST', { userId: this.user.id });
+      this.user = res.user;
+      return res;
+  }
+
+  // Admin Actions
+  async updateUser(userId: string, data: Partial<User>) {
+      await this.apiCall('/admin/update-user', 'POST', { userId, ...data });
+  }
+
+  async toggleBan(userId: string) {
+      await this.apiCall('/admin/toggle-ban', 'POST', { userId });
+  }
+
+  async adminPunish(userId: string, type: 'gold' | 'xp' | 'hp', amount: number) {
+      await this.apiCall('/admin/punish', 'POST', { userId, type, amount });
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -252,14 +291,7 @@ class GameService {
   setWeather(w: WeatherType) { this.weather = w; }
   setMotd(m: string) { this.motd = m; }
   saveSettings(s: GameSettings) { this.settings = s; }
-  async equipItem(t: any, a: string) { return this.user; }
-  async unlockSkill(s: string) { return this.user!; }
-  async sendKudos(t: string) { return "Kudos sent!"; }
-  async feedPet() { return { user: this.user!, msg: "Fed!" }; }
   async exportAttendanceCSV() { return ""; }
-  async adminPunish(uid: string, t: any, a: number) { /* Stub */ }
-  async toggleBan(uid: string) { /* Stub */ }
-  async updateUser(uid: string, d: any) { /* Stub */ }
   async getAuditLogs() { return []; }
   resetGameData() { /* Stub */ }
 }

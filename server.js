@@ -409,6 +409,66 @@ app.post('/api/action/arcade', (req, res) => {
     res.json({ user, goldEarned, xpEarned });
 });
 
+app.post('/api/action/equip', (req, res) => {
+    const { userId, type, assetId } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+
+    user.avatar_json[type] = assetId;
+    saveUser(user);
+    res.json(user);
+});
+
+app.post('/api/action/unlock-skill', (req, res) => {
+    const { userId, skillId } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+    
+    const skill = SKILL_TREE.find(s => s.id === skillId);
+    if(!skill) return res.status(400).json({error: "Skill not found"});
+
+    if (user.unlocked_skills.includes(skillId)) return res.status(400).json({error: "Already unlocked"});
+    if (user.skill_points < skill.cost) return res.status(400).json({error: "Not enough SP"});
+    if (user.level < skill.requiredLevel) return res.status(400).json({error: "Level too low"});
+
+    user.skill_points -= skill.cost;
+    user.unlocked_skills.push(skillId);
+    
+    saveUser(user);
+    logAction(userId, 'SKILL', `Unlocked ${skill.name}`);
+    res.json(user);
+});
+
+app.post('/api/action/feed-pet', (req, res) => {
+    const { userId } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+    if (!user.pet) return res.status(400).json({error: "No pet"});
+
+    if (user.current_gold < 10) return res.status(400).json({error: "Not enough gold"});
+    user.current_gold -= 10;
+    user.pet.hunger = Math.min(100, user.pet.hunger + 20);
+    user.pet.happiness = Math.min(100, user.pet.happiness + 10);
+
+    saveUser(user);
+    res.json({ user, msg: "Yum!" });
+});
+
+app.post('/api/action/kudos', (req, res) => {
+    const { fromId, toId } = req.body;
+    const sender = getUser(fromId);
+    const receiver = getUser(toId);
+    
+    if (!sender || !receiver) return res.status(404).send();
+    if (fromId === toId) return res.status(400).json({error: "Can't kudos yourself"});
+
+    receiver.kudos_received += 1;
+    receiver.current_xp += 10; // Small bonus
+    saveUser(receiver);
+    
+    res.json({ message: "Kudos sent!" });
+});
+
 app.post('/api/shop/buy', (req, res) => {
     const { userId, itemId } = req.body;
     const user = getUser(userId);
@@ -476,6 +536,43 @@ app.post('/api/admin/approve-quest', (req, res) => {
         damageBoss(50);
         logAction(userId, 'ADMIN', `Approved Quest ${qRow.title}`);
     }
+    res.json({ success: true });
+});
+
+// --- NEW ADMIN ENDPOINTS ---
+
+app.post('/api/admin/update-user', (req, res) => {
+    const { userId, name, role } = req.body;
+    // In a real app, verify request comes from an admin
+    db.prepare('UPDATE users SET name = ?, role = ? WHERE id = ?').run(name, role, userId);
+    logAction(userId, 'ADMIN', `Updated profile Role: ${role}`);
+    res.json({ success: true });
+});
+
+app.post('/api/admin/toggle-ban', (req, res) => {
+    const { userId } = req.body;
+    const user = getUser(userId);
+    if (user) {
+        const newStatus = !user.isBanned;
+        db.prepare('UPDATE users SET is_banned = ? WHERE id = ?').run(newStatus ? 1 : 0, userId);
+        logAction(userId, 'ADMIN', `${newStatus ? 'Banned' : 'Unbanned'} user`);
+        res.json({ success: true, isBanned: newStatus });
+    } else {
+        res.status(404).send();
+    }
+});
+
+app.post('/api/admin/punish', (req, res) => {
+    const { userId, type, amount } = req.body;
+    const user = getUser(userId);
+    if (!user) return res.status(404).send();
+    
+    if (type === 'hp') user.current_hp = Math.max(0, user.current_hp - amount);
+    if (type === 'gold') user.current_gold = Math.max(0, user.current_gold - amount);
+    if (type === 'xp') user.current_xp = Math.max(0, user.current_xp - amount);
+    
+    saveUser(user);
+    logAction(userId, 'ADMIN', `Punished: -${amount} ${type}`);
     res.json({ success: true });
 });
 
