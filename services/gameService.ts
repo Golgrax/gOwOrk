@@ -275,6 +275,16 @@ class GameService {
       return await this.apiCall('/admin/audit-logs');
   }
 
+  async setGlobalEvent(type: string) {
+      const mods = await this.apiCall('/admin/event', 'POST', { type });
+      this.globalModifiers = mods;
+      return mods;
+  }
+
+  async getTeamData() {
+      return await this.apiCall('/admin/stats');
+  }
+
   // Getters
   getShopItems() { return SHOP_ITEMS; }
   getAllAchievements() { return ACHIEVEMENT_LIST; }
@@ -288,19 +298,7 @@ class GameService {
 
   // Stubs
   async getLeaderboard() { return (await this.refreshData()).leaderboard; }
-  async getTeamData() { 
-      const l = await this.getLeaderboard();
-      return { 
-          totalUsers: l.length, 
-          activeShifts: 0, 
-          totalGoldInCirculation: 0, 
-          totalXpGenerated: 0, 
-          avgHappiness: 0, 
-          users: l 
-      }; 
-  }
   async giveBonus(uid: string, amt: number) { /* Stub */ }
-  setGlobalEvent(type: string) { return this.globalModifiers; }
   setWeather(w: WeatherType) { this.weather = w; }
   setMotd(m: string) { this.motd = m; }
   saveSettings(s: GameSettings) { this.settings = s; }

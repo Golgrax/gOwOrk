@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search } from 'lucide-react';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign } from 'lucide-react';
 import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 
@@ -20,7 +20,7 @@ export const ManagerDashboard: React.FC = () => {
   const [motdInput, setMotdInput] = useState(motd);
 
   // Team State
-  const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+  const [teamStats, setTeamStats] = useState<any | null>(null);
   
   // Logs State
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -137,6 +137,17 @@ export const ManagerDashboard: React.FC = () => {
           setEditingUser(null);
           getTeamData().then(setTeamStats);
       }
+  }
+  
+  // Handlers for Global Events
+  const handleToggleDoubleXp = () => {
+      const newType = globalModifiers.activeEventName === 'Training Day' ? 'none' : 'double_xp';
+      setGlobalEvent(newType as any);
+  }
+  
+  const handleToggleHappyHour = () => {
+      const newType = globalModifiers.activeEventName === 'Happy Hour' ? 'none' : 'happy_hour';
+      setGlobalEvent(newType as any);
   }
 
   const weatherOptions: { type: WeatherType, icon: React.ReactNode }[] = [
@@ -265,18 +276,20 @@ export const ManagerDashboard: React.FC = () => {
                <RetroCard title="Company Events (Buffs)" className="bg-purple-100 border-purple-900">
                     <div className="flex flex-col md:flex-row gap-4">
                         <button 
-                           onClick={() => setGlobalEvent(globalModifiers.activeEventName?.includes('Training') ? 'none' : 'double_xp')}
+                           onClick={handleToggleDoubleXp}
                            className={`flex-1 p-4 border-4 border-black font-bold uppercase flex flex-col items-center gap-2 transition-all ${globalModifiers.xpMultiplier > 1 ? 'bg-green-500 text-white animate-pulse' : 'bg-white hover:bg-gray-100'}`}
                         >
                              <GraduationCap size={32} />
                              <span>Training Day (2x XP)</span>
+                             {globalModifiers.xpMultiplier > 1 && <span className="text-[10px] bg-white text-black px-2 rounded-full">ACTIVE</span>}
                         </button>
                         <button 
-                           onClick={() => setGlobalEvent(globalModifiers.activeEventName?.includes('Happy') ? 'none' : 'happy_hour')}
+                           onClick={handleToggleHappyHour}
                            className={`flex-1 p-4 border-4 border-black font-bold uppercase flex flex-col items-center gap-2 transition-all ${globalModifiers.goldMultiplier > 1 ? 'bg-yellow-400 text-black animate-pulse' : 'bg-white hover:bg-gray-100'}`}
                         >
                              <PartyPopper size={32} />
                              <span>Happy Hour (2x Gold)</span>
+                             {globalModifiers.goldMultiplier > 1 && <span className="text-[10px] bg-black text-white px-2 rounded-full">ACTIVE</span>}
                         </button>
                     </div>
                </RetroCard>
@@ -370,85 +383,124 @@ export const ManagerDashboard: React.FC = () => {
            </>
        )}
        
-       {activeTab === 'team' && isManager && (
+       {activeTab === 'team' && isManager && teamStats && (
            <div className="space-y-6">
-               <div className="grid grid-cols-2 gap-4">
-                   <div className="bg-blue-100 border-4 border-black p-4 text-center">
+               {/* 1. OVERVIEW CARDS */}
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <div className="bg-blue-100 border-4 border-black p-3 text-center">
                        <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Active Shifts</h3>
-                       <div className="text-3xl font-bold flex justify-center items-center gap-2">
-                           <Activity size={24} className="text-blue-600"/> {teamStats?.activeShifts || 0} / {teamStats?.totalUsers || 0}
+                       <div className="text-2xl md:text-3xl font-bold flex justify-center items-center gap-2">
+                           <Activity size={24} className="text-blue-600"/> {teamStats.activeShifts || 0}
                        </div>
                    </div>
-                   <div className="bg-yellow-100 border-4 border-black p-4 text-center">
-                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Total Payroll</h3>
-                       <div className="text-3xl font-bold text-yellow-700">
-                           {teamStats?.totalGoldInCirculation.toLocaleString()} G
+                   <div className="bg-yellow-100 border-4 border-black p-3 text-center">
+                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Total Gold</h3>
+                       <div className="text-2xl md:text-3xl font-bold text-yellow-700 truncate">
+                           {(teamStats.totalGoldInCirculation || 0).toLocaleString()}
                        </div>
                    </div>
-                   <div className="bg-green-100 border-4 border-black p-4 text-center">
-                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Productivity (XP)</h3>
-                       <div className="text-3xl font-bold text-green-700">
-                           {teamStats?.totalXpGenerated.toLocaleString()} XP
+                   <div className="bg-green-100 border-4 border-black p-3 text-center">
+                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Total XP</h3>
+                       <div className="text-2xl md:text-3xl font-bold text-green-700 truncate">
+                           {(teamStats.totalXpGenerated || 0).toLocaleString()}
                        </div>
                    </div>
-                   <div className="bg-red-100 border-4 border-black p-4 text-center">
-                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Avg Happiness</h3>
-                       <div className="text-3xl font-bold text-red-700">
-                           {teamStats?.avgHappiness || 0}%
+                   <div className="bg-red-100 border-4 border-black p-3 text-center">
+                       <h3 className="text-xs uppercase font-bold text-gray-500 mb-1">Avg Morale</h3>
+                       <div className="text-2xl md:text-3xl font-bold text-red-700">
+                           {teamStats.avgHappiness || 0}%
                        </div>
                    </div>
                </div>
-               
-               {/* Advanced Charts (Visualized via CSS widths) */}
-               <RetroCard title="Productivity Metrics" className="bg-white">
-                   <div className="space-y-4">
+
+               {/* 2. ATTENDANCE & ECONOMY ROW */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Attendance Health */}
+                    <RetroCard title="Attendance Health">
+                         <div className="space-y-2 mt-2">
+                            {(() => {
+                                const stats = teamStats.attendanceStats || {early: 0, ontime: 0, late: 0, total: 1};
+                                const earlyPct = (stats.early / stats.total) * 100;
+                                const ontimePct = (stats.ontime / stats.total) * 100;
+                                const latePct = (stats.late / stats.total) * 100;
+                                return (
+                                    <>
+                                        <div className="flex h-8 w-full border-2 border-black bg-gray-200">
+                                            {stats.early > 0 && <div style={{width: `${earlyPct}%`}} className="bg-blue-400 h-full"></div>}
+                                            {stats.ontime > 0 && <div style={{width: `${ontimePct}%`}} className="bg-green-400 h-full"></div>}
+                                            {stats.late > 0 && <div style={{width: `${latePct}%`}} className="bg-red-400 h-full"></div>}
+                                        </div>
+                                        <div className="flex justify-between text-xs font-bold uppercase mt-2">
+                                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-400 border border-black"></div> Early</div>
+                                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-400 border border-black"></div> On Time</div>
+                                            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-400 border border-black"></div> Late</div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                         </div>
+                    </RetroCard>
+
+                    {/* Quest Stats */}
+                    <RetroCard title="Quest Performance">
+                         <div className="flex justify-around items-center h-full pt-2">
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-blue-600">{teamStats.questStats?.active || 0}</div>
+                                <div className="text-xs uppercase font-bold text-gray-500">Active</div>
+                            </div>
+                            <div className="text-center border-l-2 border-gray-300 pl-4">
+                                <div className="text-2xl font-bold text-yellow-600">{teamStats.questStats?.pending || 0}</div>
+                                <div className="text-xs uppercase font-bold text-gray-500">Pending</div>
+                            </div>
+                            <div className="text-center border-l-2 border-gray-300 pl-4">
+                                <div className="text-2xl font-bold text-green-600">{teamStats.questStats?.completed || 0}</div>
+                                <div className="text-xs uppercase font-bold text-gray-500">Completed</div>
+                            </div>
+                         </div>
+                    </RetroCard>
+               </div>
+
+               {/* 3. ECONOMY METRICS */}
+               <RetroCard title="Economy Insights">
+                   <div className="grid grid-cols-2 gap-4">
                        <div>
                            <div className="flex justify-between text-xs uppercase font-bold mb-1">
-                               <span>Budget Utilization</span>
-                               <span>76%</span>
+                               <span>Inflation (Gold/User)</span>
+                               <span>{teamStats.totalUsers > 0 ? Math.round(teamStats.totalGoldInCirculation / teamStats.totalUsers) : 0} G</span>
                            </div>
-                           <div className="w-full bg-gray-200 h-4 border-2 border-black">
-                               <div className="bg-yellow-500 h-full w-[76%]"></div>
+                           <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                               <div className="bg-yellow-500 h-full w-[60%]"></div>
                            </div>
                        </div>
                        <div>
                            <div className="flex justify-between text-xs uppercase font-bold mb-1">
-                               <span>Server Load</span>
-                               <span>42%</span>
+                               <span>Avg Employee Level</span>
+                               <span>Lvl {teamStats.avgLevel}</span>
                            </div>
-                           <div className="w-full bg-gray-200 h-4 border-2 border-black">
-                               <div className="bg-blue-500 h-full w-[42%]"></div>
-                           </div>
-                       </div>
-                       <div>
-                           <div className="flex justify-between text-xs uppercase font-bold mb-1">
-                               <span>Employee Morale</span>
-                               <span>{teamStats?.avgHappiness || 0}%</span>
-                           </div>
-                           <div className="w-full bg-gray-200 h-4 border-2 border-black">
-                               <div className={`h-full w-[${teamStats?.avgHappiness || 0}%] ${Number(teamStats?.avgHappiness) < 50 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${teamStats?.avgHappiness}%`}}></div>
+                           <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                               <div className="bg-blue-500 h-full w-[45%]"></div>
                            </div>
                        </div>
                    </div>
                </RetroCard>
 
-               {/* Employee Superlatives */}
+               {/* 4. SUPERLATIVES */}
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                   {teamStats?.topEarner && (
+                   {teamStats.topEarner && (
                        <div className="bg-yellow-50 border-4 border-black p-3 text-center">
                            <div className="text-xs font-bold text-gray-500 uppercase">Top Earner</div>
                            <div className="font-bold text-lg">{teamStats.topEarner.name}</div>
                            <div className="text-retro-goldDark text-sm">{teamStats.topEarner.current_gold} G</div>
                        </div>
                    )}
-                   {teamStats?.highestLevel && (
+                   {teamStats.highestLevel && (
                        <div className="bg-blue-50 border-4 border-black p-3 text-center">
                            <div className="text-xs font-bold text-gray-500 uppercase">Highest Level</div>
                            <div className="font-bold text-lg">{teamStats.highestLevel.name}</div>
                            <div className="text-blue-600 text-sm">Lvl {teamStats.highestLevel.level}</div>
                        </div>
                    )}
-                   {teamStats?.mostKudos && (
+                   {teamStats.mostKudos && (
                        <div className="bg-pink-50 border-4 border-black p-3 text-center">
                            <div className="text-xs font-bold text-gray-500 uppercase">Most Loved</div>
                            <div className="font-bold text-lg">{teamStats.mostKudos.name}</div>
@@ -459,7 +511,7 @@ export const ManagerDashboard: React.FC = () => {
            </div>
        )}
 
-       {activeTab === 'manage' && isModerator && (
+       {activeTab === 'manage' && isModerator && teamStats && (
            <div className="space-y-6">
                <RetroCard title="Data Management" className="bg-white">
                    <p className="text-sm text-gray-600 mb-4">Export attendance logs for payroll processing.</p>
@@ -477,12 +529,13 @@ export const ManagerDashboard: React.FC = () => {
                            <thead>
                                <tr className="border-b-4 border-black bg-gray-100 text-black">
                                    <th className="p-2 font-bold uppercase text-sm text-black">User</th>
-                                   <th className="p-2 font-bold uppercase text-sm text-black">Role</th>
+                                   <th className="p-2 font-bold uppercase text-sm text-black hidden md:table-cell">Role</th>
+                                   <th className="p-2 font-bold uppercase text-sm text-black hidden md:table-cell">Perf</th>
                                    <th className="p-2 font-bold uppercase text-sm text-right text-black">Actions</th>
                                </tr>
                            </thead>
                            <tbody>
-                               {teamStats?.users.map(u => (
+                               {(teamStats.users || []).map((u: User) => (
                                    <tr key={u.id} className={`border-b-2 border-gray-200 ${u.isBanned ? 'bg-red-100' : 'hover:bg-yellow-50'}`}>
                                        <td className="p-3">
                                            <div className="font-bold flex items-center gap-2 text-black">
@@ -491,7 +544,13 @@ export const ManagerDashboard: React.FC = () => {
                                            </div>
                                            <div className="text-xs text-gray-500">Lvl {u.level} • {u.current_gold}G</div>
                                        </td>
-                                       <td className="p-3 uppercase text-xs font-bold text-black">{u.role}</td>
+                                       <td className="p-3 uppercase text-xs font-bold text-black hidden md:table-cell">{u.role}</td>
+                                       <td className="p-3 hidden md:table-cell">
+                                            <div className="text-xs font-mono">
+                                                <div title="XP">{u.current_xp} XP</div>
+                                                <div title="Streak" className="text-orange-600">{u.streak} Days</div>
+                                            </div>
+                                       </td>
                                        <td className="p-3 text-right">
                                            <div className="flex justify-end gap-2">
                                                {isManager && (

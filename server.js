@@ -614,6 +614,77 @@ app.post('/api/admin/approve-quest', (req, res) => {
 
 // --- NEW ADMIN ENDPOINTS ---
 
+app.post('/api/admin/event', (req, res) => {
+    const { type } = req.body;
+    let mods = { xpMultiplier: 1, goldMultiplier: 1, activeEventName: null };
+    
+    if (type === 'double_xp') {
+        mods = { xpMultiplier: 2, goldMultiplier: 1, activeEventName: "Training Day" };
+    } else if (type === 'happy_hour') {
+        mods = { xpMultiplier: 1, goldMultiplier: 2, activeEventName: "Happy Hour" };
+    }
+    
+    db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('modifiers', ?)").run(JSON.stringify(mods));
+    res.json(mods);
+});
+
+app.get('/api/admin/stats', (req, res) => {
+    // 1. Basic User Stats
+    const users = db.prepare('SELECT * FROM users').all().map(mapUser);
+    const totalUsers = users.length;
+    const totalGold = users.reduce((acc, u) => acc + u.current_gold, 0);
+    const totalXp = users.reduce((acc, u) => acc + u.current_xp, 0);
+    const avgLevel = totalUsers > 0 ? (users.reduce((acc, u) => acc + u.level, 0) / totalUsers).toFixed(1) : 0;
+    
+    // 2. Attendance Breakdown
+    const logs = db.prepare('SELECT status FROM attendance_logs').all();
+    const attendanceStats = {
+        early: logs.filter(l => l.status === 'early_bird' || l.status === 'critical_hit').length,
+        ontime: logs.filter(l => l.status === 'ontime').length,
+        late: logs.filter(l => l.status === 'late').length,
+        total: logs.length
+    };
+    
+    // 3. Quest Stats
+    const questStats = {
+        active: db.prepare('SELECT count(*) as c FROM active_quests').get().c,
+        completed: db.prepare("SELECT count(*) as c FROM completed_quests WHERE status = 'approved'").get().c,
+        pending: db.prepare("SELECT count(*) as c FROM completed_quests WHERE status = 'pending'").get().c
+    };
+
+    // 4. Superlatives
+    const sortedByGold = [...users].sort((a,b) => b.current_gold - a.current_gold);
+    const topEarner = sortedByGold[0];
+    
+    const sortedByLevel = [...users].sort((a,b) => b.level - a.level);
+    const highestLevel = sortedByLevel[0];
+    
+    const sortedByKudos = [...users].sort((a,b) => b.kudos_received - a.kudos_received);
+    const mostKudos = sortedByKudos[0];
+
+    // 5. Avg Happiness (derived from HP)
+    const avgHappiness = totalUsers > 0 ? Math.round(users.reduce((acc, u) => acc + (u.current_hp/u.total_hp)*100, 0) / totalUsers) : 0;
+
+    // 6. Active Shifts
+    const today = new Date().toISOString().split('T')[0];
+    const activeShifts = db.prepare('SELECT count(*) as c FROM attendance_logs WHERE date = ? AND time_out IS NULL').get(today).c;
+
+    res.json({
+        totalUsers,
+        totalGoldInCirculation: totalGold,
+        totalXpGenerated: totalXp,
+        avgLevel,
+        avgHappiness,
+        activeShifts,
+        users, // Detailed list
+        topEarner,
+        highestLevel,
+        mostKudos,
+        attendanceStats,
+        questStats
+    });
+});
+
 app.get('/api/admin/audit-logs', (req, res) => {
     const logs = db.prepare(`
         SELECT a.*, u.name as user_name 

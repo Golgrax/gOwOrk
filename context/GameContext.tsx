@@ -331,14 +331,18 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       playSfx('coin');
   }
 
-  const setGlobalEvent = (type: 'none' | 'double_xp' | 'happy_hour') => {
-      const mods = gameService.setGlobalEvent(type);
-      setGlobalModifiers(mods);
-      if (type !== 'none') {
-          addToast(`EVENT STARTED: ${mods.activeEventName}`, 'success');
-          confetti();
-      } else {
-          addToast('Event Ended', 'info');
+  const setGlobalEvent = async (type: 'none' | 'double_xp' | 'happy_hour') => {
+      try {
+        const mods = await gameService.setGlobalEvent(type);
+        setGlobalModifiers(mods);
+        if (type !== 'none') {
+            addToast(`EVENT STARTED: ${mods.activeEventName}`, 'success');
+            confetti();
+        } else {
+            addToast('Event Ended', 'info');
+        }
+      } catch (e: any) {
+        addToast("Failed to set event", 'error');
       }
   }
 
