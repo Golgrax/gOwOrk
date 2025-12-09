@@ -213,6 +213,10 @@ class GameService {
       // Stub
   }
 
+  async deleteQuest(questId: string) {
+      await this.apiCall(`/admin/quest/${questId}`, 'DELETE');
+  }
+
   // --- MINIGAMES ---
   
   async spinWheel(): Promise<{ prize: WheelPrize }> {

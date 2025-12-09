@@ -229,6 +229,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addToast('Quest Rejected', 'info');
   }
 
+  const deleteQuest = async (questId: string) => {
+      await gameService.deleteQuest(questId);
+      refreshGameData();
+      addToast('Quest Deleted', 'info');
+  };
+
   const getPendingSubmissions = async () => {
       return await gameService.getPendingSubmissions();
   }
@@ -412,6 +418,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       submitQuest,
       approveQuest,
       rejectQuest,
+      deleteQuest,
       getPendingSubmissions,
       toggleOverdrive,
       buyItem,

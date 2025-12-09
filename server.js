@@ -950,6 +950,15 @@ app.post('/api/admin/audit-logs/clear', (req, res) => {
     res.json({ success: true });
 });
 
+app.delete('/api/admin/quest/:id', (req, res) => {
+    const { id } = req.params;
+    // We only delete from active_quests. This might leave orphaned records in completed_quests,
+    // but ensures history is kept for those who already did it, while removing it for others.
+    db.prepare('DELETE FROM active_quests WHERE id = ?').run(id);
+    printSystemLog('ADMIN', `Deleted Quest: ${id}`);
+    res.json({ success: true });
+});
+
 app.delete('/api/admin/user/:id', (req, res) => {
     const { id } = req.params;
     const user = getUser(id);

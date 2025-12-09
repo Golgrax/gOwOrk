@@ -191,6 +191,7 @@ export interface GameState {
   submitQuest: (questId: string) => void; // User submits
   approveQuest: (userId: string, questId: string) => Promise<void>; // Admin approves
   rejectQuest: (userId: string, questId: string) => Promise<void>; // Admin rejects
+  deleteQuest: (questId: string) => Promise<void>; // Admin deletes
   getPendingSubmissions: () => Promise<QuestSubmission[]>;
   toggleOverdrive: () => void;
   buyItem: (itemId: string) => void;

@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { CheckCircle, ShieldAlert, Star, RefreshCw, Lock, Clock } from 'lucide-react';
+import { CheckCircle, ShieldAlert, Star, RefreshCw, Lock, Clock, Trash2 } from 'lucide-react';
 
 export const QuestBoard: React.FC = () => {
-  const { activeQuests, submitQuest, userQuestStatuses, user, nextQuestRefresh, isShiftActive } = useGame();
+  const { activeQuests, submitQuest, deleteQuest, userQuestStatuses, user, nextQuestRefresh, isShiftActive } = useGame();
   const [timeLeft, setTimeLeft] = useState('');
+
+  const isAdmin = user?.role === 'manager' || user?.role === 'moderator';
 
   useEffect(() => {
       const updateTimer = () => {
@@ -23,6 +25,12 @@ export const QuestBoard: React.FC = () => {
       const interval = setInterval(updateTimer, 60000); // Update every minute
       return () => clearInterval(interval);
   }, [nextQuestRefresh]);
+
+  const handleDelete = (questId: string, title: string) => {
+      if (window.confirm(`Are you sure you want to delete quest "${title}"?`)) {
+          deleteQuest(questId);
+      }
+  };
 
   return (
     <div className="space-y-4">
@@ -67,24 +75,36 @@ export const QuestBoard: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => submitQuest(quest.id)}
-                  disabled={isCompleted || isPending || !isShiftActive}
-                  className={`
-                    ml-4 px-4 py-2 text-sm font-bold border-2 border-black pixel-shadow flex items-center gap-2
-                    ${isCompleted 
-                      ? 'bg-gray-400 text-gray-700 cursor-default shadow-none translate-y-1 translate-x-1' 
-                      : isPending 
-                        ? 'bg-yellow-300 text-yellow-800 cursor-not-allowed'
-                        : !isShiftActive
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-retro-green hover:bg-green-400 text-black active:translate-y-1 active:shadow-none'
-                    }
-                  `}
-                >
-                  {!isShiftActive && !isCompleted && !isPending ? <Lock size={14} /> : null}
-                  {isCompleted ? 'DONE' : isPending ? <><Clock size={14}/> PENDING</> : 'COMPLETE'}
-                </button>
+                <div className="flex flex-col items-end gap-2 ml-4">
+                    <button
+                      onClick={() => submitQuest(quest.id)}
+                      disabled={isCompleted || isPending || !isShiftActive}
+                      className={`
+                        px-4 py-2 text-sm font-bold border-2 border-black pixel-shadow flex items-center gap-2 w-full justify-center
+                        ${isCompleted 
+                          ? 'bg-gray-400 text-gray-700 cursor-default shadow-none translate-y-1 translate-x-1' 
+                          : isPending 
+                            ? 'bg-yellow-300 text-yellow-800 cursor-not-allowed'
+                            : !isShiftActive
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-retro-green hover:bg-green-400 text-black active:translate-y-1 active:shadow-none'
+                        }
+                      `}
+                    >
+                      {!isShiftActive && !isCompleted && !isPending ? <Lock size={14} /> : null}
+                      {isCompleted ? 'DONE' : isPending ? <><Clock size={14}/> PENDING</> : 'COMPLETE'}
+                    </button>
+
+                    {isAdmin && (
+                        <button 
+                            onClick={() => handleDelete(quest.id, quest.title)}
+                            className="text-red-500 hover:text-red-700 p-1 bg-white border-2 border-transparent hover:border-black transition-all"
+                            title="Delete Quest (Admin)"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
               </div>
             </RetroCard>
           );
