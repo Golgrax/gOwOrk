@@ -5,6 +5,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,8 +159,35 @@ const DEFAULT_QUESTS = [
 
 function logAction(userId, type, details) {
     const id = crypto.randomUUID();
+    const timestamp = Date.now();
     const stmt = db.prepare('INSERT INTO audit_logs (id, user_id, action_type, details, timestamp) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(id, userId, type, details, Date.now());
+    stmt.run(id, userId, type, details, timestamp);
+
+    // --- IDE TERMINAL LOGGING ---
+    // Fetch username for clearer logs
+    let username = 'Unknown';
+    try {
+        const u = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+        if (u) username = u.username;
+    } catch (e) {}
+
+    const timeStr = new Date(timestamp).toLocaleTimeString();
+    
+    // ANSI Color Codes for Terminal
+    const RESET = '\x1b[0m';
+    const CYAN = '\x1b[36m';   // System
+    const RED = '\x1b[31m';    // Admin
+    const GREEN = '\x1b[32m';  // Quest/Gain
+    const YELLOW = '\x1b[33m'; // Shop/Gold
+    const DIM = '\x1b[2m';
+
+    let color = RESET;
+    if (type === 'SYSTEM') color = CYAN;
+    if (type === 'ADMIN') color = RED;
+    if (type === 'SHOP' || type === 'SPIN') color = YELLOW;
+    if (type === 'QUEST' || type === 'SKILL') color = GREEN;
+
+    console.log(`${DIM}[${timeStr}]${RESET} ${color}[${type}]${RESET} <${username}> ${details}`);
 }
 
 function getUser(id) {
@@ -216,6 +244,7 @@ function checkLevelUp(user) {
         user.level++;
         user.skill_points++;
         user.total_hp += 10;
+        console.log(`\x1b[35m[LEVEL UP]\x1b[0m ${user.username} reached Level ${user.level}!`);
         return true;
     }
     return false;
@@ -225,7 +254,10 @@ function damageBoss(amt) {
     let boss = JSON.parse(db.prepare("SELECT value FROM game_globals WHERE key = 'boss'").get()?.value || JSON.stringify(INITIAL_BOSS));
     if (boss.isActive) {
         boss.currentHp = Math.max(0, boss.currentHp - amt);
-        if (boss.currentHp === 0) boss.isActive = false;
+        if (boss.currentHp === 0) {
+            boss.isActive = false;
+            console.log(`\x1b[31m[BOSS DEFEATED]\x1b[0m The ${boss.name} has been slain!`);
+        }
         db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('boss', ?)").run(JSON.stringify(boss));
     }
 }
@@ -248,6 +280,7 @@ function runMaintenance() {
                 INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `).run(id, q.title, q.description, q.reward_gold, q.reward_xp, q.type, expiresAt);
+            console.log(`[MAINTENANCE] Generated Daily Quest: ${q.title}`);
         }
     }
 }
@@ -275,7 +308,7 @@ setInterval(() => {
         const currentRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
         if (!currentRow || currentRow.value !== newWeather) {
             db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('weather', ?)").run(newWeather);
-            console.log(`[AutoWeather] Changed to ${newWeather}`);
+            console.log(`[AutoWeather] Changed to ${newWeather} (Hour: ${hour})`);
         }
     }
 }, 60000);
@@ -284,11 +317,23 @@ setInterval(() => {
 
 // Auth
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
-    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-    if (!row) return res.status(404).json({ error: "User not found" });
-    if (row.is_banned) return res.status(403).json({ error: "Banned" });
-    res.json(mapUser(row));
+    try {
+        const { username, password } = req.body;
+        const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+        if (!row) {
+            console.log(`[AUTH] Failed login attempt for: ${username}`);
+            return res.status(404).json({ error: "User not found" });
+        }
+        if (row.is_banned) {
+            console.log(`[AUTH] Banned user tried to login: ${username}`);
+            return res.status(403).json({ error: "Banned" });
+        }
+        console.log(`[AUTH] ${username} logged in.`);
+        res.json(mapUser(row));
+    } catch (e) {
+        console.error("Login Error:", e);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 });
 
 app.post('/api/auth/register', (req, res) => {
@@ -299,10 +344,12 @@ app.post('/api/auth/register', (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, '["item_cap_red","item_apron_green"]', '[]', '[]', 1, 100, 100, 100)
         `);
         stmt.run(id, username, password_hash, name, role, JSON.stringify(avatar_json));
-        logAction(id, 'SYSTEM', 'Registered');
+        logAction(id, 'SYSTEM', 'Registered Account');
+        console.log(`[AUTH] New User Registered: ${username} (${role})`);
         res.json(getUser(id));
     } catch (e) {
-        res.status(400).json({ error: "Username taken" });
+        console.error("Registration Error:", e);
+        res.status(400).json({ error: "Username taken or invalid data" });
     }
 });
 
@@ -454,6 +501,9 @@ app.post('/api/action/work', (req, res) => {
     damageBoss(1);
     saveUser(user);
     
+    // Removed overly verbose work logs to prevent terminal spam
+    // logAction(userId, 'WORK', `Worked ${bonusMessage}`); 
+    
     res.json({ user, earned: `+${gold}G +${xp}XP${bonusMessage}` });
 });
 
@@ -475,6 +525,7 @@ app.post('/api/action/take-break', (req, res) => {
 
     user.current_hp = Math.min(user.total_hp, user.current_hp + recoverAmount);
     saveUser(user);
+    // logAction(userId, 'BREAK', `Rested (+${recoverAmount}HP)`);
 
     res.json({ user, recovered: recoverAmount, message: `Rested: +${recoverAmount} HP${msg}` });
 });
@@ -659,6 +710,7 @@ app.post('/api/admin/create-quest', (req, res) => {
     const expiresAt = Date.now() + (durationHours * 3600000);
     db.prepare('INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(Date.now().toString(), title, description, reward_gold, reward_xp, type, expiresAt);
+    console.log(`[ADMIN] Created Quest: ${title}`);
     res.json({ success: true });
 });
 
@@ -698,12 +750,14 @@ app.post('/api/admin/event', (req, res) => {
     }
     
     db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('modifiers', ?)").run(JSON.stringify(mods));
+    console.log(`[ADMIN] Event triggered: ${type}`);
     res.json(mods);
 });
 
 app.post('/api/admin/auto-weather', (req, res) => {
     const { enabled } = req.body;
     db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('auto_weather', ?)").run(JSON.stringify({ enabled }));
+    console.log(`[ADMIN] Auto-Weather set to: ${enabled}`);
     res.json({ success: true, enabled });
 });
 
