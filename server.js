@@ -96,10 +96,10 @@ db.exec(schema);
 
 // --- SHARED CONSTANTS ---
 const SKILL_TREE = [
-    { id: 'skill_barista_mastery', effectType: 'gold_boost', effectValue: 0.2 },
-    { id: 'skill_iron_lungs', effectType: 'max_hp_boost', effectValue: 20 },
-    { id: 'skill_charisma', effectType: 'shop_discount', effectValue: 0.15 },
-    { id: 'skill_fast_learner', effectType: 'xp_boost', effectValue: 0.1 },
+    { id: 'skill_barista_mastery', name: 'Barista Mastery', cost: 1, requiredLevel: 2, effectType: 'gold_boost', effectValue: 0.2 },
+    { id: 'skill_iron_lungs', name: 'Iron Lungs', cost: 1, requiredLevel: 3, effectType: 'max_hp_boost', effectValue: 20 },
+    { id: 'skill_charisma', name: 'Charisma', cost: 2, requiredLevel: 5, effectType: 'shop_discount', effectValue: 0.15 },
+    { id: 'skill_fast_learner', name: 'Fast Learner', cost: 3, requiredLevel: 8, effectType: 'xp_boost', effectValue: 0.1 },
 ];
 
 const SHOP_ITEMS = [
