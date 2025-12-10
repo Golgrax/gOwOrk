@@ -51,8 +51,8 @@ export const LoginScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-retro-bg flex items-center justify-center p-4 font-vt323">
       <div className="w-full max-w-md bg-white border-4 border-black pixel-shadow p-8 text-center relative">
-         <div className="mb-6 flex justify-center text-retro-gold">
-            <Gamepad2 size={64} />
+         <div className="mb-6 flex justify-center">
+            <img src="/components/logos/logo_192x192.png" alt="gOwOrk Logo" className="w-24 h-24" />
          </div>
          <h1 className="text-4xl font-bold mb-2 uppercase">gOwOrk</h1>
          <p className="text-gray-600 mb-8 font-sans text-sm">Gamified Attendance System<br/>Now with SQLite & Secure Auth</p>
