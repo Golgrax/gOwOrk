@@ -13,7 +13,7 @@ import AdmZip from 'adm-zip';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server (v1.0.8)...");
+console.log("Starting gOwOrk Server (v1.0.10)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,9 +41,37 @@ console.log(`----------------------------------------------------------------`);
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// --- ROBUST LOGO SERVING ---
+// We check multiple possible locations for the 'logos' folder to handle different deployment structures
+// or if the user placed the folder in 'public', 'src', root, or components.
+const possibleLogoPaths = [
+    path.join(__dirname, 'logos'),            // Root directory (Manual upload)
+    path.join(__dirname, 'public', 'logos'),  // Vite Public source (Standard)
+    path.join(__dirname, 'dist', 'logos'),    // Build output (Production)
+    path.join(__dirname, 'src', 'logos'),     // Source directory (Common mistake)
+    path.join(__dirname, 'assets', 'logos'),  // Assets directory
+    path.join(__dirname, 'components', 'logos'), // Components directory (User specific)
+    path.join(__dirname, 'src', 'components', 'logos') // Nested Components
+];
+
+let logosServed = false;
+for (const logoPath of possibleLogoPaths) {
+    if (fs.existsSync(logoPath)) {
+        console.log(`[Static] Serving logos from: ${logoPath}`);
+        app.use('/logos', express.static(logoPath));
+        logosServed = true;
+        break; // Stop after finding the first valid match to avoid conflicts
+    }
+}
+
+if (!logosServed) {
+    console.warn("\x1b[33m[Warning] 'logos' directory not found in any common path. Images may be missing.\x1b[0m");
+    console.log("Checked paths:", possibleLogoPaths);
+}
+
+// Serve Main App (Frontend)
 app.use(express.static(path.join(__dirname, 'dist')));
-// Serve custom logos directory
-app.use('/logos', express.static(path.join(__dirname, 'logos')));
 
 // Ensure upload directory exists
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
