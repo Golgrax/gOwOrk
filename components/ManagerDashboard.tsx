@@ -121,7 +121,7 @@ export const ManagerDashboard: React.FC = () => {
   };
 
   const handleExportDb = async () => {
-      const pwd = window.prompt("Security Check: Enter your password to export the database.");
+      const pwd = window.prompt("Security Check: Enter your password to DOWNLOAD the full database backup (ZIP).");
       if (pwd) {
           await exportDatabase(pwd);
       }
@@ -132,11 +132,11 @@ export const ManagerDashboard: React.FC = () => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
+      if (e.target.files && e.target.files.length > 0) {
+          const files = e.target.files;
           const pwd = window.prompt("WARNING: This will OVERWRITE the current database.\nEnter password to confirm restore:");
           if (pwd) {
-              await importDatabase(file, pwd);
+              await importDatabase(files, pwd);
           }
           // Reset input
           e.target.value = '';
@@ -599,20 +599,21 @@ export const ManagerDashboard: React.FC = () => {
                              onClick={handleExportDb}
                              className="flex-1 bg-blue-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-blue-500"
                            >
-                               <Database size={16} /> Backup DB (SQL)
+                               <Database size={16} /> Backup DB (ZIP)
                            </button>
                            <button 
                              onClick={handleImportClick}
                              className="flex-1 bg-orange-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-orange-500"
                            >
-                               <Upload size={16} /> Restore DB
+                               <Upload size={16} /> Restore DB (Upload Files)
                            </button>
-                           {/* Hidden File Input */}
+                           {/* Hidden File Input: MULTIPLE ALLOWED */}
                            <input 
                                type="file" 
                                ref={fileInputRef} 
                                onChange={handleFileChange} 
-                               accept=".db" 
+                               accept=".db,.db-wal,.db-shm,.zip" 
+                               multiple
                                className="hidden"
                            />
                        </div>

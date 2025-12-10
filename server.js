@@ -8,11 +8,12 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
 import multer from 'multer';
+import archiver from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server (v1.0.4)...");
+console.log("Starting gOwOrk Server (v1.0.7)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1022,57 +1023,53 @@ app.delete('/api/admin/user/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// Database Export Endpoint (Protected)
+// Database Export Endpoint (Protected) - ZIPS ALL FILES
 app.post('/api/admin/export-db', async (req, res) => {
     try {
-        const { userId, password_hash, filename } = req.body;
+        const { userId, password_hash } = req.body;
         
         // Auth Check
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
-        if (!user || user.password_hash !== password_hash) {
-             return res.status(403).json({ error: "Invalid Credentials" });
-        }
-        if (user.role !== 'manager') {
+        if (!user || user.password_hash !== password_hash || user.role !== 'manager') {
              return res.status(403).json({ error: "Unauthorized" });
         }
 
-        // MODE 1: Download specific file (if filename provided)
-        if (filename) {
-            const allowedFiles = [
-                path.basename(DB_PATH),
-                path.basename(DB_PATH) + '-wal',
-                path.basename(DB_PATH) + '-shm'
-            ];
-            
-            // Security: Prevent directory traversal
-            if (!allowedFiles.includes(filename)) {
-                return res.status(400).json({ error: "Invalid filename requested" });
-            }
+        const archive = archiver('zip', {
+            zlib: { level: 9 } // Sets the compression level.
+        });
 
-            const filePath = path.join(path.dirname(DB_PATH), filename);
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: "File not found" });
+        // Listen for all archive data to be written
+        archive.on('warning', function(err) {
+            if (err.code === 'ENOENT') {
+                console.warn("Archiver warning:", err);
+            } else {
+                throw err;
             }
+        });
 
-            // Send file
-            return res.download(filePath, filename);
+        archive.on('error', function(err) {
+            throw err;
+        });
+
+        // Pipe archive data to the response
+        res.attachment('gowork-backup.zip');
+        archive.pipe(res);
+
+        // Add files
+        if (fs.existsSync(DB_PATH)) {
+            archive.file(DB_PATH, { name: 'gowork.db' });
+        }
+        if (fs.existsSync(`${DB_PATH}-wal`)) {
+            archive.file(`${DB_PATH}-wal`, { name: 'gowork.db-wal' });
+        }
+        if (fs.existsSync(`${DB_PATH}-shm`)) {
+            archive.file(`${DB_PATH}-shm`, { name: 'gowork.db-shm' });
         }
 
-        // MODE 2: List available files (if no filename)
-        const availableFiles = [];
-        const baseName = path.basename(DB_PATH);
+        // Finalize the archive (ie we are done appending files but streams have to finish yet)
+        await archive.finalize();
         
-        // Check main db
-        if (fs.existsSync(DB_PATH)) availableFiles.push(baseName);
-        
-        // Check WAL/SHM (might not exist if db closed cleanly or not in WAL mode, but usually do in better-sqlite3)
-        if (fs.existsSync(DB_PATH + '-wal')) availableFiles.push(baseName + '-wal');
-        if (fs.existsSync(DB_PATH + '-shm')) availableFiles.push(baseName + '-shm');
-
-        res.json({ files: availableFiles });
-
-        // Only log action once per session ideally, but logging here is fine
-        logAction(userId, 'ADMIN', 'Listed Database Files for Export');
+        logAction(userId, 'ADMIN', 'Exported Database ZIP');
 
     } catch (e) {
         console.error("Export DB Error:", e);
@@ -1082,22 +1079,22 @@ app.post('/api/admin/export-db', async (req, res) => {
     }
 });
 
-// Database IMPORT Endpoint (RESTORE)
-app.post('/api/admin/import-db', upload.single('database'), async (req, res) => {
+// Database IMPORT Endpoint (RESTORE) - HANDLES MULTIPLE FILES
+app.post('/api/admin/import-db', upload.array('files'), async (req, res) => {
     const { userId, password_hash } = req.body;
 
     try {
-        // Auth Check (must manually query because multer parses body after file if mixed)
-        // Actually multer provides body fields in req.body
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
         if (!user || user.password_hash !== password_hash || user.role !== 'manager') {
-             // Cleanup uploaded file if auth fails
-             if (req.file) fs.unlinkSync(req.file.path);
+             // Cleanup uploaded files
+             if (req.files && Array.isArray(req.files)) {
+                 req.files.forEach(f => fs.unlinkSync(f.path));
+             }
              return res.status(403).json({ error: "Unauthorized or Invalid Credentials" });
         }
 
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded" });
+        if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
+            return res.status(400).json({ error: "No files uploaded" });
         }
 
         console.log("Starting Database Restore...");
@@ -1105,13 +1102,33 @@ app.post('/api/admin/import-db', upload.single('database'), async (req, res) => 
         // 1. Close existing connection
         db.close();
 
-        // 2. Delete existing DB and WAL files to prevent corruption
+        // 2. Delete existing DB files
         if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
         if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
         if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
 
-        // 3. Move uploaded file to DB_PATH
-        fs.renameSync(req.file.path, DB_PATH);
+        // 3. Move uploaded files to DB_PATH with correct names
+        if (Array.isArray(req.files)) {
+            req.files.forEach(file => {
+                let targetPath = '';
+                // Check extension or name pattern to determine where it goes
+                if (file.originalname.endsWith('.db') || file.originalname === 'gowork.db') {
+                    targetPath = DB_PATH;
+                } else if (file.originalname.endsWith('-wal')) {
+                    targetPath = `${DB_PATH}-wal`;
+                } else if (file.originalname.endsWith('-shm')) {
+                    targetPath = `${DB_PATH}-shm`;
+                }
+
+                if (targetPath) {
+                    fs.renameSync(file.path, targetPath);
+                    console.log(`Restored: ${file.originalname} -> ${targetPath}`);
+                } else {
+                    // Cleanup unrelated files
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
 
         // 4. Reopen connection
         db = new Database(DB_PATH);
@@ -1124,7 +1141,6 @@ app.post('/api/admin/import-db', upload.single('database'), async (req, res) => 
 
     } catch (e) {
         console.error("Import DB Error:", e);
-        // Attempt to reopen DB if it failed during restore to keep server alive
         try { if (!db.open) db = new Database(DB_PATH); } catch (err) {}
         res.status(500).json({ error: e.message });
     }
@@ -1136,8 +1152,6 @@ app.get('*', (req, res) => {
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        // If dist folder is missing (deployment error), don't crash the server.
-        // Send a helpful 404 message instead of letting Express error out.
         res.status(404).send(`
             <h1>Application Build Not Found</h1>
             <p>The <code>dist/index.html</code> file is missing.</p>

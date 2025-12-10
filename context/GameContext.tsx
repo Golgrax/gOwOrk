@@ -14,7 +14,7 @@ interface ExtendedGameState extends Omit<GameState, 'login' | 'spinWheel' | 'rec
     recordArcadePlay: (score: number) => Promise<void>;
     toggleAutoWeather: (enabled: boolean) => Promise<void>;
     exportDatabase: (password: string) => Promise<void>;
-    importDatabase: (file: File, password: string) => Promise<void>;
+    importDatabase: (files: FileList, password: string) => Promise<void>;
     isAutoWeather: boolean;
 }
 
@@ -370,15 +370,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const exportDatabase = async (password: string) => { 
       try {
           await gameService.exportDatabase(password); 
-          addToast('Database Export Started', 'info'); 
+          addToast('Database Backup Started (ZIP)', 'info'); 
       } catch (e: any) {
           addToast(e.message || 'Export Failed', 'error');
       }
   }
 
-  const importDatabase = async (file: File, password: string) => {
+  const importDatabase = async (files: FileList, password: string) => {
       try {
-          await gameService.importDatabase(file, password);
+          await gameService.importDatabase(files, password);
           addToast('Database Restored! Reloading...', 'success');
           setTimeout(() => window.location.reload(), 2000);
       } catch (e: any) {

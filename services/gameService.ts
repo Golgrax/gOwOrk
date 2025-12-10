@@ -80,6 +80,8 @@ class GameService {
               const data = await res.json();
               if (!res.ok) throw new Error(data.error || `Error ${res.status}: ${res.statusText}`);
               return data;
+          } else if (contentType && contentType.indexOf("zip") !== -1) {
+              return await res.blob(); // Return blob for zip downloads
           } else {
               throw new Error("Server Unreachable. Please ensure the backend (node server.js) is running.");
           }
@@ -326,60 +328,36 @@ class GameService {
 
   async exportAttendanceCSV() { return ""; } // Legacy stub
   
-  // NEW: DB Export Protected (No Archiver)
+  // NEW: DB Export (Zip)
   async exportDatabase(password: string) {
       if (!this.user) return;
       
       const hash = await this.hashPassword(password);
       
-      // 1. Get the list of available files
-      const listRes = await fetch('/api/admin/export-db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: this.user.id, password_hash: hash })
+      const blob = await this.apiCall('/admin/export-db', 'POST', { 
+          userId: this.user.id, 
+          password_hash: hash 
       });
 
-      if (!listRes.ok) {
-          throw new Error("Export failed: Incorrect password or unauthorized.");
-      }
-
-      const { files } = await listRes.json();
-
-      if (!files || files.length === 0) {
-          throw new Error("No database files found.");
-      }
-
-      // 2. Download each file sequentially with a small delay
-      for (const filename of files) {
-          const fileRes = await fetch('/api/admin/export-db', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: this.user.id, password_hash: hash, filename: filename })
-          });
-
-          if (fileRes.ok) {
-              const blob = await fileRes.blob();
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = filename;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              window.URL.revokeObjectURL(url);
-              
-              await new Promise(r => setTimeout(r, 800));
-          }
-      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "gowork-backup.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
   }
 
-  // NEW: Import Database
-  async importDatabase(file: File, password: string) {
+  // NEW: Import Database (Multiple Files)
+  async importDatabase(files: FileList, password: string) {
       if (!this.user) return;
       const hash = await this.hashPassword(password);
 
       const formData = new FormData();
-      formData.append('database', file);
+      for (let i = 0; i < files.length; i++) {
+          formData.append('files', files[i]);
+      }
       formData.append('userId', this.user.id);
       formData.append('password_hash', hash);
 
