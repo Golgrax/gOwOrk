@@ -105,7 +105,7 @@ const GameLayout: React.FC = () => {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden text-gray-900 font-vt323">
+    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden text-gray-900 font-vt323 bg-[#1a1a1a]">
       
       <GameScene 
           config={user.avatar_json} 

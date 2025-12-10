@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/Golgrax/gOwOrk/refs/heads/main/components/logos/logo_48x48.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>gOwOrk - RPG Attendance</title>
     <!-- We keep the Tailwind CDN for simplicity in this specific "portable" setup. -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,7 @@
         padding: 0;
         overflow: hidden; /* App handles scrolling */
         background-color: #1a1a1a;
+        touch-action: none; /* Prevent pull-to-refresh on mobile */
       }
       .pixel-shadow {
         box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
@@ -81,6 +82,9 @@
                 darkBg: '#1f2937', // Battlefield Dark
                 darkAccent: '#7f1d1d',
               }
+            },
+            spacing: {
+              'safe': 'env(safe-area-inset-bottom, 20px)'
             }
           }
         }

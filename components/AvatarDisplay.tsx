@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { AvatarConfig } from '../types';
 
@@ -9,9 +9,20 @@ interface AvatarProps {
   isOverdrive: boolean;
 }
 
-export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOverdrive }) => {
+export const AvatarDisplay: React.FC<AvatarProps> = React.memo(({ config, hpPercent, isOverdrive }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  
+  // Use refs for values accessed inside the animation loop.
+  // This prevents the heavy Three.js setup effect from re-running whenever HP changes.
+  const hpRef = useRef(hpPercent);
   const timeRef = useRef(0);
+
+  useEffect(() => {
+    hpRef.current = hpPercent;
+  }, [hpPercent]);
+
+  // Create a stable key for config to avoid re-renders on shallow object reference changes
+  const configKey = useMemo(() => JSON.stringify(config), [config]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -148,6 +159,7 @@ export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOver
       frameId = requestAnimationFrame(animate);
       timeRef.current += isOverdrive ? 0.15 : 0.05;
       const time = timeRef.current;
+      const currentHp = hpRef.current; // Read from ref
 
       // Bobbing
       charGroup.position.y = Math.sin(time) * 0.2;
@@ -160,7 +172,7 @@ export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOver
       rightArm.rotation.x = -Math.sin(time) * 0.2;
 
       // Sad state (Low HP)
-      if (hpPercent < 50) {
+      if (currentHp < 50) {
         headGroup.rotation.x = 0.3; // Look down
         charGroup.rotation.z = Math.sin(time * 0.5) * 0.05; // Wobble
       } else {
@@ -196,10 +208,23 @@ export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOver
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameId);
-      if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
+      
+      // Robust Cleanup to prevent memory leaks
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+            object.geometry.dispose();
+            if (Array.isArray(object.material)) {
+                object.material.forEach((m: THREE.Material) => m.dispose());
+            } else {
+                object.material.dispose();
+            }
+        }
+      });
+      
       renderer.dispose();
+      if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
     };
-  }, [config, hpPercent, isOverdrive]);
+  }, [configKey, isOverdrive]); // Only rebuild if Config or Mode changes. HP changes are handled via ref.
 
   return (
     <div className="relative mx-auto mt-4 mb-8">
@@ -219,4 +244,4 @@ export const AvatarDisplay: React.FC<AvatarProps> = ({ config, hpPercent, isOver
       </div>
     </div>
   );
-};
+});
