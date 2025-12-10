@@ -1,4 +1,3 @@
-
 import express from 'express';
 import Database from 'better-sqlite3';
 import cors from 'cors';
@@ -43,6 +42,8 @@ console.log(`----------------------------------------------------------------`);
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'dist')));
+// Serve custom logos directory
+app.use('/logos', express.static(path.join(__dirname, 'logos')));
 
 // Ensure upload directory exists
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {

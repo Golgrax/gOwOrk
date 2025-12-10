@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useGame } from '../context/GameContext';
-import { Flame, Zap, Sparkles, Heart } from 'lucide-react';
+import { Flame, Sparkles, Heart } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, motd, globalModifiers } = useGame();
@@ -15,6 +15,9 @@ export const Header: React.FC = () => {
     <div className="sticky top-0 z-40 shadow-lg">
       <header className="p-4 bg-white border-b-4 border-black flex flex-wrap gap-4 justify-between items-center relative z-20">
          <div className="flex items-center gap-4">
+           {/* Branding Logo */}
+           <img src="/logos/logo.png" alt="Logo" className="h-10 w-10 object-contain border-2 border-black bg-retro-gold rounded-full pixel-shadow hidden md:block" />
+
            <div className="w-12 h-12 bg-gray-200 border-2 border-black flex items-center justify-center font-bold text-2xl relative shrink-0">
              {user.level}
              {user.streak > 0 && (
