@@ -8,12 +8,10 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
 
-// NOTE: Archiver is now imported dynamically in the route handler to prevent startup crashes.
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server...");
+console.log("Starting gOwOrk Server (v1.0.2)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,9 +20,17 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'gowork.db');
 
 console.log(`----------------------------------------------------------------`);
 console.log(`DATABASE CONFIGURATION:`);
-console.log(`Path: ${DB_PATH}`);
-console.log(`To ensure persistence on Render, mount a disk to /var/data`);
-console.log(`and set DB_PATH environment variable to /var/data/gowork.db`);
+console.log(`Target DB Path: ${DB_PATH}`);
+
+if (!process.env.DB_PATH && process.env.RENDER) {
+    console.log(`\x1b[33mWARNING: You are using the default ephemeral storage on Render.\x1b[0m`);
+    console.log(`\x1b[33mData WILL BE LOST when the server restarts or redeploys.\x1b[0m`);
+    console.log(`To fix this:`);
+    console.log(`1. Create a Disk in Render Dashboard (mount to /var/data)`);
+    console.log(`2. Add Environment Variable: DB_PATH = /var/data/gowork.db`);
+} else {
+    console.log(`\x1b[32mPersistence Configuration looks good.\x1b[0m`);
+}
 console.log(`----------------------------------------------------------------`);
 
 // Middleware
@@ -1021,45 +1027,49 @@ app.post('/api/admin/export-db', async (req, res) => {
              return res.status(403).json({ error: "Unauthorized" });
         }
 
-        // Dynamic Import to avoid startup crash if module is missing
-        let archiver;
-        try {
-            const m = await import('archiver');
-            archiver = m.default;
-        } catch (e) {
-            console.error("Archiver module failed to load:", e);
-            return res.status(500).json({ error: "Archiver module missing. Cannot export." });
-        }
-
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        res.attachment(`gowork_db_backup_${timestamp}.zip`);
-
-        const archive = archiver('zip', {
-            zlib: { level: 9 }
-        });
-
-        archive.on('error', function(err) {
-            console.error("Archive Error", err);
-            if (!res.headersSent) {
-                res.status(500).send({error: err.message});
-            }
-        });
-
-        // Pipe archive data to the response
-        archive.pipe(res);
-
-        // Add potential database files
-        const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
+        // --- EXPORT STRATEGY ---
+        // 1. Try to use 'archiver' to zip all DB files (wal/shm included)
+        // 2. If 'archiver' is missing (deployment issue), fallback to sending just the .db file raw.
         
-        files.forEach(f => {
-            if (fs.existsSync(f)) {
-                archive.file(f, { name: path.basename(f) });
+        try {
+            const archiver = (await import('archiver')).default;
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            res.attachment(`gowork_db_backup_${timestamp}.zip`);
+
+            const archive = archiver('zip', { zlib: { level: 9 } });
+
+            archive.on('error', function(err) {
+                console.error("Archive Error", err);
+                // If header not sent, try to send error, otherwise it crashes stream
+                if (!res.headersSent) res.status(500).send({error: err.message});
+            });
+
+            archive.pipe(res);
+
+            const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
+            files.forEach(f => {
+                if (fs.existsSync(f)) {
+                    archive.file(f, { name: path.basename(f) });
+                }
+            });
+
+            archive.finalize();
+            logAction(userId, 'ADMIN', 'Exported Database Backup (ZIP)');
+
+        } catch (e) {
+            console.warn("Archiver module not found or failed. Falling back to raw file download.", e);
+            
+            // Fallback: Send the main DB file directly
+            if (fs.existsSync(DB_PATH)) {
+                res.download(DB_PATH, 'gowork_fallback.db', (err) => {
+                    if (err) console.error("File download failed", err);
+                });
+                logAction(userId, 'ADMIN', 'Exported Database Backup (Raw Fallback)');
+            } else {
+                res.status(500).json({ error: "Database file not found on server." });
             }
-        });
-
-        archive.finalize();
-
-        logAction(userId, 'ADMIN', 'Exported Database Backup');
+        }
 
     } catch (e) {
         console.error("Export DB Error:", e);

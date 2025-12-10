@@ -42,14 +42,28 @@ npm run build
 npm start
 ```
 
-## ☁️ Deployment (Render)
+## ☁️ Deployment & Data Persistence (Render)
 
 When deploying to Render.com, ensure you use the following settings:
 
 *   **Build Command**: `npm install && npm run build`
 *   **Start Command**: `npm start`
 
-*Note: Data persistence on the free tier of Render is ephemeral. The SQLite database file will reset on every redeploy unless you attach a persistent disk and set `DB_PATH`.*
+### ⚠️ IMPORTANT: Saving Data Permanently
+By default, Render wipes all data when the server restarts (ephemeral storage). To keep your user accounts and logs:
+
+1.  Go to your Render Dashboard -> **Disks**.
+2.  Create a new Disk:
+    *   **Name**: `gowork-data`
+    *   **Mount Path**: `/var/data`
+    *   **Size**: 1GB is plenty.
+    *   Attach it to your Web Service.
+3.  Go to **Environment Variables** for your service.
+4.  Add a new variable:
+    *   **Key**: `DB_PATH`
+    *   **Value**: `/var/data/gowork.db`
+
+The application will now save the database to the persistent disk, allowing you to access the same data from multiple devices and across restarts.
 
 ## 🎮 Gameplay Guide
 
