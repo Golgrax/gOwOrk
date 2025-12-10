@@ -7,7 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
-import archiver from 'archiver';
+
+// NOTE: Archiver is now imported dynamically in the route handler to prevent startup crashes.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +17,15 @@ console.log("Starting gOwOrk Server...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_PATH = process.env.DB_PATH || 'gowork.db';
+// Default to a local file, but allow override via env var (crucial for Render Disks)
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'gowork.db');
+
+console.log(`----------------------------------------------------------------`);
+console.log(`DATABASE CONFIGURATION:`);
+console.log(`Path: ${DB_PATH}`);
+console.log(`To ensure persistence on Render, mount a disk to /var/data`);
+console.log(`and set DB_PATH environment variable to /var/data/gowork.db`);
+console.log(`----------------------------------------------------------------`);
 
 // Middleware
 app.use(cors());
@@ -27,11 +36,24 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // Ensure directory exists if using a custom path
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+    console.log(`Creating database directory: ${dbDir}`);
+    try {
+        fs.mkdirSync(dbDir, { recursive: true });
+    } catch (err) {
+        console.error(`Error creating DB directory: ${err.message}`);
+    }
 }
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+let db;
+try {
+    db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    console.log("Database connected successfully.");
+} catch (err) {
+    console.error("CRITICAL: Failed to connect to database:", err);
+    console.error("Server will exit.");
+    process.exit(1);
+}
 
 // Migrations
 const schema = `
@@ -986,7 +1008,7 @@ app.delete('/api/admin/user/:id', (req, res) => {
 });
 
 // Database Export Endpoint (Protected)
-app.post('/api/admin/export-db', (req, res) => {
+app.post('/api/admin/export-db', async (req, res) => {
     try {
         const { userId, password_hash } = req.body;
         
@@ -997,6 +1019,16 @@ app.post('/api/admin/export-db', (req, res) => {
         }
         if (user.role !== 'manager') {
              return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        // Dynamic Import to avoid startup crash if module is missing
+        let archiver;
+        try {
+            const m = await import('archiver');
+            archiver = m.default;
+        } catch (e) {
+            console.error("Archiver module failed to load:", e);
+            return res.status(500).json({ error: "Archiver module missing. Cannot export." });
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
