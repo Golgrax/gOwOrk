@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { X, Volume2, VolumeX, Speaker, Trash2, Database } from 'lucide-react';
+import { X, Volume2, VolumeX, Speaker, Trash2, Info, Database } from 'lucide-react';
 
 interface SettingsModalProps {
     onClose: () => void;
@@ -27,8 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </button>
 
                 <h2 className="text-2xl font-bold uppercase mb-6 flex items-center gap-2 border-b-4 border-black pb-2">
-                    <img src="/logos/logo.png" className="h-8 w-8 object-contain" alt="Logo" />
-                    System Settings
+                    <Info className="text-retro-gold" /> System Settings
                 </h2>
 
                 <div className="space-y-6">

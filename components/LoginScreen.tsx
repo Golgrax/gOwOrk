@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { User, KeyRound, UserPlus, LogIn, Check } from 'lucide-react';
+import { Gamepad2, User, KeyRound, UserPlus, LogIn, Check } from 'lucide-react';
 import { gameService } from '../services/gameService';
 
 export const LoginScreen: React.FC = () => {
@@ -52,7 +52,7 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen bg-retro-bg flex items-center justify-center p-4 font-vt323">
       <div className="w-full max-w-md bg-white border-4 border-black pixel-shadow p-8 text-center relative">
          <div className="mb-6 flex justify-center text-retro-gold">
-            <img src="/logos/logo.png" alt="gOwOrk Logo" className="h-24 w-24 object-contain pixel-shadow border-4 border-black bg-white rounded-full p-2" />
+            <Gamepad2 size={64} />
          </div>
          <h1 className="text-4xl font-bold mb-2 uppercase">gOwOrk</h1>
          <p className="text-gray-600 mb-8 font-sans text-sm">Gamified Attendance System<br/>Now with SQLite & Secure Auth</p>
