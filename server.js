@@ -7,22 +7,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
+import archiver from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-// Render sets process.env.PORT. Fallback to 3000 for local.
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || 'gowork.db';
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-// Serve built frontend files from /dist
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- DATABASE SETUP ---
+// Ensure directory exists if using a custom path
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
@@ -984,7 +984,7 @@ app.delete('/api/admin/user/:id', (req, res) => {
 });
 
 // Database Export Endpoint (Protected)
-app.post('/api/admin/export-db', async (req, res) => {
+app.post('/api/admin/export-db', (req, res) => {
     try {
         const { userId, password_hash } = req.body;
         
@@ -998,20 +998,32 @@ app.post('/api/admin/export-db', async (req, res) => {
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupPath = path.join(__dirname, `gowork_backup_${timestamp}.db`);
+        res.attachment(`gowork_db_backup_${timestamp}.zip`);
 
-        // Create backup using native better-sqlite3 functionality
-        await db.backup(backupPath);
+        const archive = archiver('zip', {
+            zlib: { level: 9 }
+        });
 
-        res.download(backupPath, `gowork_backup_${timestamp}.db`, (err) => {
-            if (err) {
-                 console.error("Download Error:", err);
-            }
-            // Cleanup after sending
-            if (fs.existsSync(backupPath)) {
-                fs.unlinkSync(backupPath);
+        archive.on('error', function(err) {
+            console.error("Archive Error", err);
+            if (!res.headersSent) {
+                res.status(500).send({error: err.message});
             }
         });
+
+        // Pipe archive data to the response
+        archive.pipe(res);
+
+        // Add potential database files
+        const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
+        
+        files.forEach(f => {
+            if (fs.existsSync(f)) {
+                archive.file(f, { name: path.basename(f) });
+            }
+        });
+
+        archive.finalize();
 
         logAction(userId, 'ADMIN', 'Exported Database Backup');
 
@@ -1041,14 +1053,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`\x1b[32m[SERVER] gOwOrk Online on port ${PORT}\x1b[0m`);
-    
-    // Check if build exists
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
-    if (!fs.existsSync(indexPath)) {
-        console.log(`\x1b[33m[WARNING] 'dist/index.html' not found. You must run 'npm run build' before 'npm start' to see the frontend.\x1b[0m`);
-    } else {
-        console.log(`\x1b[36m[INFO] Serving static files from /dist\x1b[0m`);
-        console.log(`\x1b[36m[INFO] Open: http://localhost:${PORT}\x1b[0m`);
-    }
+    console.log(`Server running on port ${PORT}`);
 });
