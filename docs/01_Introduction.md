@@ -28,12 +28,13 @@ The core business objectives for the gOwOrk system are defined to address curren
 4.  **Economy System:** A virtual shop for purchasing cosmetic items and consumables using earned Gold.
 5.  **Interactive Gameplay:** Inclusion of Minigames (e.g., Coffee Rush), Boss Raids, and interactive 3D environments to maintain engagement.
 6.  **Admin Dashboard:** Tools for user management, disciplinary actions ("Smite/Ban"), data export (CSV), and global event management.
+7.  **Server-Side Persistence:** A Node.js backend using SQLite to securely store user data, ensuring cross-device access and preventing client-side tampering.
 
 ### Out-of-Scope
 *   **Real-world Payroll Processing:** The system exports data but does not handle direct bank transfers, tax calculations, or payslip generation.
 *   **Hardware Integration:** The system is software-only and does not integrate with biometric scanners or physical punch cards.
 *   **Native Mobile App:** The project is a Progressive Web Application (PWA) / Responsive Web App, not a native iOS/Android binary.
-*   **External Database Hosting:** The current iteration utilizes a local-first architecture (LocalStorage/SQLite WASM) for portability and privacy, rather than a centralized cloud SQL database.
+*   **Distributed Cloud SQL:** The system utilizes a file-based SQLite database for portability and simplicity, rather than a scalable distributed SQL instance (like Postgres/MySQL).
 
 ## 1.5 Project Objectives and KPIs
 
