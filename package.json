@@ -1,11 +1,11 @@
 {
   "name": "gowork",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"node server.js\" \"vite\"",
-    "build": "tsc && vite build",
+    "build": "npm install && tsc && vite build",
     "preview": "vite preview",
     "start": "node server.js"
   },
