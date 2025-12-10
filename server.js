@@ -7,16 +7,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
+import multer from 'multer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server (v1.0.3)...");
+console.log("Starting gOwOrk Server (v1.0.4)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 // Default to a local file, but allow override via env var (crucial for Render Disks)
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'gowork.db');
+
+// Configure Multer for temp uploads
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 console.log(`----------------------------------------------------------------`);
 console.log(`DATABASE CONFIGURATION:`);
@@ -37,6 +41,11 @@ console.log(`----------------------------------------------------------------`);
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'dist')));
+
+// Ensure upload directory exists
+if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
+    fs.mkdirSync(path.join(__dirname, 'uploads'));
+}
 
 // --- DATABASE SETUP ---
 // Ensure directory exists if using a custom path
@@ -1070,6 +1079,54 @@ app.post('/api/admin/export-db', async (req, res) => {
         if (!res.headersSent) {
             res.status(500).send({ error: "Failed to process export request" });
         }
+    }
+});
+
+// Database IMPORT Endpoint (RESTORE)
+app.post('/api/admin/import-db', upload.single('database'), async (req, res) => {
+    const { userId, password_hash } = req.body;
+
+    try {
+        // Auth Check (must manually query because multer parses body after file if mixed)
+        // Actually multer provides body fields in req.body
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+        if (!user || user.password_hash !== password_hash || user.role !== 'manager') {
+             // Cleanup uploaded file if auth fails
+             if (req.file) fs.unlinkSync(req.file.path);
+             return res.status(403).json({ error: "Unauthorized or Invalid Credentials" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        console.log("Starting Database Restore...");
+        
+        // 1. Close existing connection
+        db.close();
+
+        // 2. Delete existing DB and WAL files to prevent corruption
+        if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
+        if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
+        if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
+
+        // 3. Move uploaded file to DB_PATH
+        fs.renameSync(req.file.path, DB_PATH);
+
+        // 4. Reopen connection
+        db = new Database(DB_PATH);
+        db.pragma('journal_mode = WAL');
+        
+        console.log("Database Restored Successfully.");
+        logAction(userId, 'ADMIN', 'Restored Database from Backup');
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Import DB Error:", e);
+        // Attempt to reopen DB if it failed during restore to keep server alive
+        try { if (!db.open) db = new Database(DB_PATH); } catch (err) {}
+        res.status(500).json({ error: e.message });
     }
 });
 

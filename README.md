@@ -49,21 +49,23 @@ When deploying to Render.com, ensure you use the following settings:
 *   **Build Command**: `npm install && npm run build`
 *   **Start Command**: `npm start`
 
-### ⚠️ IMPORTANT: Saving Data Permanently
-By default, Render wipes all data when the server restarts (ephemeral storage). To keep your user accounts and logs:
+### ⚠️ IMPORTANT: Saving Data (Free vs Paid)
 
-1.  Go to your Render Dashboard -> **Disks**.
-2.  Create a new Disk:
-    *   **Name**: `gowork-data`
-    *   **Mount Path**: `/var/data`
-    *   **Size**: 1GB is plenty.
-    *   Attach it to your Web Service.
-3.  Go to **Environment Variables** for your service.
-4.  Add a new variable:
-    *   **Key**: `DB_PATH`
-    *   **Value**: `/var/data/gowork.db`
+#### Paid Option (Automatic Persistence)
+If you upgrade to a **Render Starter Plan ($7/mo)**, you can use Render Disks for automatic persistence:
+1.  Go to Dashboard -> Disks -> Create `gowork-data` (Mount path: `/var/data`).
+2.  Add Environment Variable: `DB_PATH = /var/data/gowork.db`.
 
-The application will now save the database to the persistent disk, allowing you to access the same data from multiple devices and across restarts.
+#### Free Option (Manual Persistence)
+On the **Free Tier**, Render wipes all data when the server restarts (every ~15 mins of inactivity). 
+To keep your data for free, use the built-in **Backup & Restore** tools:
+
+1.  **Backup:** Before leaving or ending your shift, go to the **Admin Dashboard** -> **Data Management** and click **"Backup DB (SQL)"**. This downloads your database file.
+2.  **Restore:** If the server restarts and wipes your data:
+    *   Create a fresh admin account (register as `admin`).
+    *   Go to **Admin Dashboard**.
+    *   Click **"Restore DB"** and upload your last backup file.
+    *   The system will instantly restore all users, logs, and XP.
 
 ## 🎮 Gameplay Guide
 

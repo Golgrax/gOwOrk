@@ -1,14 +1,15 @@
 
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
-import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock, Trash2, Database } from 'lucide-react';
+import { PlusCircle, CloudRain, Sun, Snowflake, Zap, CloudFog, Flame, Megaphone, Users, Activity, BarChart3, Gift, PartyPopper, GraduationCap, Download, Ban, Gavel, UserCog, Save, FileText, Check, X, Inbox, Search, TrendingUp, DollarSign, Clock, Trash2, Database, Upload } from 'lucide-react';
 import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../types';
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, exportDatabase, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, exportDatabase, importDatabase, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -35,6 +36,8 @@ export const ManagerDashboard: React.FC = () => {
   // Manage Modal State
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [punishMode, setPunishMode] = useState<{userId: string, type: 'gold' | 'xp' | 'hp', amount: number} | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isManager = user?.role === 'manager';
   const isModerator = user?.role === 'moderator' || isManager; // Mods have partial access
@@ -121,6 +124,22 @@ export const ManagerDashboard: React.FC = () => {
       const pwd = window.prompt("Security Check: Enter your password to export the database.");
       if (pwd) {
           await exportDatabase(pwd);
+      }
+  };
+
+  const handleImportClick = () => {
+      if(fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const pwd = window.prompt("WARNING: This will OVERWRITE the current database.\nEnter password to confirm restore:");
+          if (pwd) {
+              await importDatabase(file, pwd);
+          }
+          // Reset input
+          e.target.value = '';
       }
   };
 
@@ -567,20 +586,36 @@ export const ManagerDashboard: React.FC = () => {
        {activeTab === 'manage' && isModerator && teamStats && (
            <div className="space-y-6">
                <RetroCard title="Data Management" className="bg-white">
-                   <p className="text-sm text-gray-600 mb-4">Export system data for backup or payroll.</p>
-                   <div className="flex flex-col md:flex-row gap-4">
+                   <p className="text-sm text-gray-600 mb-4">Export system data for backup or payroll. Import to restore state.</p>
+                   <div className="flex flex-col gap-4">
                        <button 
                          onClick={handleExport}
                          className="flex-1 bg-green-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-green-500"
                        >
                            <Download size={16} /> Export Logs (CSV)
                        </button>
-                       <button 
-                         onClick={handleExportDb}
-                         className="flex-1 bg-blue-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-blue-500"
-                       >
-                           <Database size={16} /> Export Database (SQL)
-                       </button>
+                       <div className="flex gap-4">
+                           <button 
+                             onClick={handleExportDb}
+                             className="flex-1 bg-blue-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-blue-500"
+                           >
+                               <Database size={16} /> Backup DB (SQL)
+                           </button>
+                           <button 
+                             onClick={handleImportClick}
+                             className="flex-1 bg-orange-600 text-white px-4 py-2 border-2 border-black font-bold uppercase flex justify-center items-center gap-2 hover:bg-orange-500"
+                           >
+                               <Upload size={16} /> Restore DB
+                           </button>
+                           {/* Hidden File Input */}
+                           <input 
+                               type="file" 
+                               ref={fileInputRef} 
+                               onChange={handleFileChange} 
+                               accept=".db" 
+                               className="hidden"
+                           />
+                       </div>
                    </div>
                </RetroCard>
 

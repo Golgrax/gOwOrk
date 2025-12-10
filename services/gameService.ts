@@ -63,12 +63,16 @@ class GameService {
   constructor() {}
 
   private async apiCall(endpoint: string, method: string = 'GET', body?: any) {
-      const headers = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = {};
+      if (!(body instanceof FormData)) {
+          headers['Content-Type'] = 'application/json';
+      }
+      
       try {
           const res = await fetch(`/api${endpoint}`, {
               method,
               headers,
-              body: body ? JSON.stringify(body) : undefined
+              body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined)
           });
 
           const contentType = res.headers.get("content-type");
@@ -345,7 +349,7 @@ class GameService {
           throw new Error("No database files found.");
       }
 
-      // 2. Download each file sequentially with a small delay to allow browser to handle multiple downloads
+      // 2. Download each file sequentially with a small delay
       for (const filename of files) {
           const fileRes = await fetch('/api/admin/export-db', {
               method: 'POST',
@@ -364,10 +368,22 @@ class GameService {
               document.body.removeChild(a);
               window.URL.revokeObjectURL(url);
               
-              // Small delay between downloads
               await new Promise(r => setTimeout(r, 800));
           }
       }
+  }
+
+  // NEW: Import Database
+  async importDatabase(file: File, password: string) {
+      if (!this.user) return;
+      const hash = await this.hashPassword(password);
+
+      const formData = new FormData();
+      formData.append('database', file);
+      formData.append('userId', this.user.id);
+      formData.append('password_hash', hash);
+
+      await this.apiCall('/admin/import-db', 'POST', formData);
   }
 
   // Getters

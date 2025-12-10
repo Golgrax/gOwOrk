@@ -1,7 +1,7 @@
 {
   "name": "gowork",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"node server.js\" \"vite\"",
@@ -18,7 +18,8 @@
     "express": "^4.18.2",
     "better-sqlite3": "^9.4.3",
     "cors": "^2.8.5",
-    "body-parser": "^1.20.2"
+    "body-parser": "^1.20.2",
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.6.4",
