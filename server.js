@@ -9,11 +9,12 @@ import crypto from 'crypto';
 import fs from 'fs';
 import multer from 'multer';
 import archiver from 'archiver';
+import AdmZip from 'adm-zip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server (v1.0.7)...");
+console.log("Starting gOwOrk Server (v1.0.8)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,88 +62,94 @@ if (!fs.existsSync(dbDir)) {
 }
 
 let db;
-try {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    console.log("Database connected successfully.");
-} catch (err) {
-    console.error("CRITICAL: Failed to connect to database:", err);
-    console.error("Server will exit.");
-    process.exit(1);
+
+function initDB() {
+    try {
+        if (db && db.open) db.close();
+        db = new Database(DB_PATH);
+        db.pragma('journal_mode = WAL');
+        
+        // Migrations
+        const schema = `
+          CREATE TABLE IF NOT EXISTS users (
+              id TEXT PRIMARY KEY,
+              username TEXT UNIQUE,
+              password_hash TEXT,
+              name TEXT,
+              role TEXT,
+              level INTEGER DEFAULT 1,
+              current_xp INTEGER DEFAULT 0,
+              current_gold INTEGER DEFAULT 0,
+              current_hp INTEGER DEFAULT 100,
+              total_hp INTEGER DEFAULT 100,
+              streak INTEGER DEFAULT 0,
+              last_login_date TEXT,
+              last_spin_date TEXT,
+              last_mystery_box_date TEXT,
+              last_arcade_play_time INTEGER,
+              skill_points INTEGER DEFAULT 0,
+              kudos_received INTEGER DEFAULT 0,
+              is_banned BOOLEAN DEFAULT 0,
+              avatar_json TEXT,
+              inventory TEXT,
+              achievements TEXT,
+              unlocked_skills TEXT,
+              pet_json TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS attendance_logs (
+              id TEXT PRIMARY KEY,
+              user_id TEXT,
+              date TEXT,
+              time_in TEXT,
+              time_out TEXT,
+              status TEXT,
+              xp_earned INTEGER,
+              FOREIGN KEY(user_id) REFERENCES users(id)
+          );
+
+          CREATE TABLE IF NOT EXISTS audit_logs (
+              id TEXT PRIMARY KEY,
+              user_id TEXT,
+              action_type TEXT,
+              details TEXT,
+              timestamp INTEGER,
+              FOREIGN KEY(user_id) REFERENCES users(id)
+          );
+
+          CREATE TABLE IF NOT EXISTS active_quests (
+              id TEXT PRIMARY KEY,
+              title TEXT,
+              description TEXT,
+              reward_gold INTEGER,
+              reward_xp INTEGER,
+              type TEXT,
+              expires_at INTEGER
+          );
+
+          CREATE TABLE IF NOT EXISTS completed_quests (
+              user_id TEXT,
+              quest_id TEXT,
+              status TEXT DEFAULT 'pending',
+              PRIMARY KEY (user_id, quest_id),
+              FOREIGN KEY(user_id) REFERENCES users(id)
+          );
+
+          CREATE TABLE IF NOT EXISTS game_globals (
+              key TEXT PRIMARY KEY,
+              value TEXT
+          );
+        `;
+        db.exec(schema);
+        console.log("Database initialized and connected.");
+    } catch (err) {
+        console.error("CRITICAL: Failed to connect/init database:", err);
+        if (!process.env.RENDER) process.exit(1);
+    }
 }
 
-// Migrations
-const schema = `
-  CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE,
-      password_hash TEXT,
-      name TEXT,
-      role TEXT,
-      level INTEGER DEFAULT 1,
-      current_xp INTEGER DEFAULT 0,
-      current_gold INTEGER DEFAULT 0,
-      current_hp INTEGER DEFAULT 100,
-      total_hp INTEGER DEFAULT 100,
-      streak INTEGER DEFAULT 0,
-      last_login_date TEXT,
-      last_spin_date TEXT,
-      last_mystery_box_date TEXT,
-      last_arcade_play_time INTEGER,
-      skill_points INTEGER DEFAULT 0,
-      kudos_received INTEGER DEFAULT 0,
-      is_banned BOOLEAN DEFAULT 0,
-      avatar_json TEXT,
-      inventory TEXT,
-      achievements TEXT,
-      unlocked_skills TEXT,
-      pet_json TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS attendance_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      date TEXT,
-      time_in TEXT,
-      time_out TEXT,
-      status TEXT,
-      xp_earned INTEGER,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS audit_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      action_type TEXT,
-      details TEXT,
-      timestamp INTEGER,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS active_quests (
-      id TEXT PRIMARY KEY,
-      title TEXT,
-      description TEXT,
-      reward_gold INTEGER,
-      reward_xp INTEGER,
-      type TEXT,
-      expires_at INTEGER
-  );
-
-  CREATE TABLE IF NOT EXISTS completed_quests (
-      user_id TEXT,
-      quest_id TEXT,
-      status TEXT DEFAULT 'pending',
-      PRIMARY KEY (user_id, quest_id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS game_globals (
-      key TEXT PRIMARY KEY,
-      value TEXT
-  );
-`;
-db.exec(schema);
+// Initial Connection
+initDB();
 
 // --- SHARED CONSTANTS ---
 const SKILL_TREE = [
@@ -207,37 +214,39 @@ const DEFAULT_QUESTS = [
 // --- HELPER FUNCTIONS ---
 
 function logAction(userId, type, details) {
-    const id = crypto.randomUUID();
-    const timestamp = Date.now();
-    const stmt = db.prepare('INSERT INTO audit_logs (id, user_id, action_type, details, timestamp) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(id, userId, type, details, timestamp);
-
-    // --- IDE TERMINAL LOGGING ---
-    // Fetch username for clearer logs
-    let username = 'Unknown';
     try {
-        const u = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
-        if (u) username = u.username;
-    } catch (e) {}
+        const id = crypto.randomUUID();
+        const timestamp = Date.now();
+        const stmt = db.prepare('INSERT INTO audit_logs (id, user_id, action_type, details, timestamp) VALUES (?, ?, ?, ?, ?)');
+        stmt.run(id, userId, type, details, timestamp);
 
-    const timeStr = new Date(timestamp).toLocaleTimeString();
-    
-    // ANSI Color Codes for Terminal
-    const RESET = '\x1b[0m';
-    const CYAN = '\x1b[36m';   // System
-    const RED = '\x1b[31m';    // Admin
-    const GREEN = '\x1b[32m';  // Quest/Gain
-    const YELLOW = '\x1b[33m'; // Shop/Gold
-    const PURPLE = '\x1b[35m'; // Level Up
-    const DIM = '\x1b[2m';
+        // --- IDE TERMINAL LOGGING ---
+        let username = 'Unknown';
+        try {
+            const u = db.prepare('SELECT username FROM users WHERE id = ?').get(userId);
+            if (u) username = u.username;
+        } catch (e) {}
 
-    let color = RESET;
-    if (type === 'SYSTEM') color = CYAN;
-    if (type === 'ADMIN') color = RED;
-    if (type === 'SHOP' || type === 'SPIN') color = YELLOW;
-    if (type === 'QUEST' || type === 'SKILL' || type === 'WORK') color = GREEN;
+        const timeStr = new Date(timestamp).toLocaleTimeString();
+        
+        // ANSI Color Codes for Terminal
+        const RESET = '\x1b[0m';
+        const CYAN = '\x1b[36m';   // System
+        const RED = '\x1b[31m';    // Admin
+        const GREEN = '\x1b[32m';  // Quest/Gain
+        const YELLOW = '\x1b[33m'; // Shop/Gold
+        const DIM = '\x1b[2m';
 
-    console.log(`${DIM}[${timeStr}]${RESET} ${color}[${type}]${RESET} <${username}> ${details}`);
+        let color = RESET;
+        if (type === 'SYSTEM') color = CYAN;
+        if (type === 'ADMIN') color = RED;
+        if (type === 'SHOP' || type === 'SPIN') color = YELLOW;
+        if (type === 'QUEST' || type === 'SKILL' || type === 'WORK') color = GREEN;
+
+        console.log(`${DIM}[${timeStr}]${RESET} ${color}[${type}]${RESET} <${username}> ${details}`);
+    } catch (e) {
+        console.error("Log Action Error (Ignored):", e.message);
+    }
 }
 
 function printSystemLog(type, msg) {
@@ -323,52 +332,60 @@ function damageBoss(amt) {
 
 function runMaintenance() {
     const now = Date.now();
-    db.prepare('DELETE FROM active_quests WHERE expires_at < ?').run(now);
+    try {
+        db.prepare('DELETE FROM active_quests WHERE expires_at < ?').run(now);
 
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
-    const expiration = new Date(today);
-    expiration.setHours(23, 59, 59, 999);
-    const expiresAt = expiration.getTime();
-    
-    for (const q of DEFAULT_QUESTS) {
-        const id = `${q.baseId}_${dateStr}`;
-        const existing = db.prepare('SELECT id FROM active_quests WHERE id = ?').get(id);
-        if (!existing) {
-             db.prepare(`
-                INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `).run(id, q.title, q.description, q.reward_gold, q.reward_xp, q.type, expiresAt);
-            printSystemLog('MAINTENANCE', `Generated Daily Quest: ${q.title}`);
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const expiration = new Date(today);
+        expiration.setHours(23, 59, 59, 999);
+        const expiresAt = expiration.getTime();
+        
+        for (const q of DEFAULT_QUESTS) {
+            const id = `${q.baseId}_${dateStr}`;
+            const existing = db.prepare('SELECT id FROM active_quests WHERE id = ?').get(id);
+            if (!existing) {
+                 db.prepare(`
+                    INSERT INTO active_quests (id, title, description, reward_gold, reward_xp, type, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `).run(id, q.title, q.description, q.reward_gold, q.reward_xp, q.type, expiresAt);
+                printSystemLog('MAINTENANCE', `Generated Daily Quest: ${q.title}`);
+            }
         }
+    } catch(e) {
+        console.error("Maintenance Error:", e.message);
     }
 }
 
 // --- WEATHER SCHEDULER ---
 // Run every minute to check if weather should change
 setInterval(() => {
-    const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
-    const isAuto = autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false;
+    try {
+        const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
+        const isAuto = autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false;
 
-    if (isAuto) {
-        const now = new Date();
-        const hour = now.getHours();
-        let newWeather = 'Sunny';
+        if (isAuto) {
+            const now = new Date();
+            const hour = now.getHours();
+            let newWeather = 'Sunny';
 
-        // Schedule Logic
-        if (hour >= 0 && hour < 6) newWeather = 'Snowy'; // Cold Night
-        else if (hour >= 6 && hour < 9) newWeather = 'Foggy'; // Morning Mist
-        else if (hour >= 9 && hour < 12) newWeather = 'Sunny'; // Morning Sun
-        else if (hour >= 12 && hour < 15) newWeather = 'Heatwave'; // Peak Heat
-        else if (hour >= 15 && hour < 18) newWeather = 'Rainy'; // Afternoon Shower
-        else if (hour >= 18) newWeather = 'Sunny'; // Evening Clear
+            // Schedule Logic
+            if (hour >= 0 && hour < 6) newWeather = 'Snowy'; // Cold Night
+            else if (hour >= 6 && hour < 9) newWeather = 'Foggy'; // Morning Mist
+            else if (hour >= 9 && hour < 12) newWeather = 'Sunny'; // Morning Sun
+            else if (hour >= 12 && hour < 15) newWeather = 'Heatwave'; // Peak Heat
+            else if (hour >= 15 && hour < 18) newWeather = 'Rainy'; // Afternoon Shower
+            else if (hour >= 18) newWeather = 'Sunny'; // Evening Clear
 
-        // Only update if changed
-        const currentRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
-        if (!currentRow || currentRow.value !== newWeather) {
-            db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('weather', ?)").run(newWeather);
-            printSystemLog('AutoWeather', `Changed to ${newWeather} (Hour: ${hour})`);
+            // Only update if changed
+            const currentRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
+            if (!currentRow || currentRow.value !== newWeather) {
+                db.prepare("INSERT OR REPLACE INTO game_globals (key, value) VALUES ('weather', ?)").run(newWeather);
+                printSystemLog('AutoWeather', `Changed to ${newWeather} (Hour: ${hour})`);
+            }
         }
+    } catch(e) {
+        // Silent catch for DB locks
     }
 }, 60000);
 
@@ -412,40 +429,49 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 app.get('/api/user/:id', (req, res) => {
-    const u = getUser(req.params.id);
-    u ? res.json(u) : res.status(404).send();
+    try {
+        const u = getUser(req.params.id);
+        u ? res.json(u) : res.status(404).send();
+    } catch (e) {
+        res.status(500).json({error: "DB Error"});
+    }
 });
 
 // Data Refresh
 app.get('/api/data/refresh', (req, res) => {
     runMaintenance();
     const userId = req.query.userId;
-    const users = db.prepare('SELECT * FROM users ORDER BY current_xp DESC').all().map(mapUser);
-    const quests = db.prepare('SELECT * FROM active_quests').all();
-    const bossRow = db.prepare("SELECT value FROM game_globals WHERE key = 'boss'").get();
-    const boss = bossRow ? JSON.parse(bossRow.value) : INITIAL_BOSS;
-    const weatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
-    const motdRow = db.prepare("SELECT value FROM game_globals WHERE key = 'motd'").get();
-    const globalModsRow = db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get();
-    const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
-    
-    // Fetch user specific quest status
-    let userQuestStatus = {};
-    if (userId) {
-        const submissions = db.prepare('SELECT quest_id, status FROM completed_quests WHERE user_id = ?').all(userId);
-        submissions.forEach(s => userQuestStatus[s.quest_id] = s.status);
-    }
+    try {
+        const users = db.prepare('SELECT * FROM users ORDER BY current_xp DESC').all().map(mapUser);
+        const quests = db.prepare('SELECT * FROM active_quests').all();
+        const bossRow = db.prepare("SELECT value FROM game_globals WHERE key = 'boss'").get();
+        const boss = bossRow ? JSON.parse(bossRow.value) : INITIAL_BOSS;
+        const weatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'weather'").get();
+        const motdRow = db.prepare("SELECT value FROM game_globals WHERE key = 'motd'").get();
+        const globalModsRow = db.prepare("SELECT value FROM game_globals WHERE key = 'modifiers'").get();
+        const autoWeatherRow = db.prepare("SELECT value FROM game_globals WHERE key = 'auto_weather'").get();
+        
+        // Fetch user specific quest status
+        let userQuestStatus = {};
+        if (userId) {
+            const submissions = db.prepare('SELECT quest_id, status FROM completed_quests WHERE user_id = ?').all(userId);
+            submissions.forEach(s => userQuestStatus[s.quest_id] = s.status);
+        }
 
-    res.json({
-        leaderboard: users,
-        activeQuests: quests,
-        userQuestStatus, // Send this back
-        bossEvent: boss,
-        weather: weatherRow ? weatherRow.value : 'Sunny',
-        motd: motdRow ? motdRow.value : '',
-        globalModifiers: globalModsRow ? JSON.parse(globalModsRow.value) : { xpMultiplier: 1, goldMultiplier: 1 },
-        autoWeather: autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false
-    });
+        res.json({
+            leaderboard: users,
+            activeQuests: quests,
+            userQuestStatus, // Send this back
+            bossEvent: boss,
+            weather: weatherRow ? weatherRow.value : 'Sunny',
+            motd: motdRow ? motdRow.value : '',
+            globalModifiers: globalModsRow ? JSON.parse(globalModsRow.value) : { xpMultiplier: 1, goldMultiplier: 1 },
+            autoWeather: autoWeatherRow ? JSON.parse(autoWeatherRow.value).enabled : false
+        });
+    } catch (e) {
+        console.error("Refresh Data Error:", e);
+        res.status(500).send();
+    }
 });
 
 // Actions
@@ -1079,7 +1105,7 @@ app.post('/api/admin/export-db', async (req, res) => {
     }
 });
 
-// Database IMPORT Endpoint (RESTORE) - HANDLES MULTIPLE FILES
+// Database IMPORT Endpoint (RESTORE) - HANDLES MULTIPLE FILES & ZIP
 app.post('/api/admin/import-db', upload.array('files'), async (req, res) => {
     const { userId, password_hash } = req.body;
 
@@ -1102,46 +1128,80 @@ app.post('/api/admin/import-db', upload.array('files'), async (req, res) => {
         // 1. Close existing connection
         db.close();
 
-        // 2. Delete existing DB files
+        // 2. Delete existing DB files to prepare for overwrite
         if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
         if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
         if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
 
-        // 3. Move uploaded files to DB_PATH with correct names
+        // 3. Process Uploaded Files
         if (Array.isArray(req.files)) {
-            req.files.forEach(file => {
-                let targetPath = '';
-                // Check extension or name pattern to determine where it goes
-                if (file.originalname.endsWith('.db') || file.originalname === 'gowork.db') {
-                    targetPath = DB_PATH;
-                } else if (file.originalname.endsWith('-wal')) {
-                    targetPath = `${DB_PATH}-wal`;
-                } else if (file.originalname.endsWith('-shm')) {
-                    targetPath = `${DB_PATH}-shm`;
-                }
+            for (const file of req.files) {
+                // HANDLE ZIP EXTRACTION
+                if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
+                    console.log(`Extracting ZIP: ${file.originalname}`);
+                    const zip = new AdmZip(file.path);
+                    const zipEntries = zip.getEntries();
+                    
+                    zipEntries.forEach((entry) => {
+                        // We map extracted files to their correct destination based on extension/name
+                        let targetFile = null;
+                        if (entry.entryName === 'gowork.db' || entry.entryName.endsWith('.db')) {
+                            targetFile = DB_PATH;
+                        } else if (entry.entryName === 'gowork.db-wal' || entry.entryName.endsWith('.db-wal')) {
+                            targetFile = `${DB_PATH}-wal`;
+                        } else if (entry.entryName === 'gowork.db-shm' || entry.entryName.endsWith('.db-shm')) {
+                            targetFile = `${DB_PATH}-shm`;
+                        }
 
-                if (targetPath) {
-                    fs.renameSync(file.path, targetPath);
-                    console.log(`Restored: ${file.originalname} -> ${targetPath}`);
-                } else {
-                    // Cleanup unrelated files
+                        if (targetFile) {
+                            fs.writeFileSync(targetFile, entry.getData());
+                            console.log(`Restored from ZIP: ${entry.entryName} -> ${targetFile}`);
+                        }
+                    });
+                    
+                    // Cleanup zip
                     fs.unlinkSync(file.path);
+                } 
+                // HANDLE RAW FILES
+                else {
+                    let targetPath = '';
+                    if (file.originalname.endsWith('.db') || file.originalname === 'gowork.db') {
+                        targetPath = DB_PATH;
+                    } else if (file.originalname.endsWith('-wal')) {
+                        targetPath = `${DB_PATH}-wal`;
+                    } else if (file.originalname.endsWith('-shm')) {
+                        targetPath = `${DB_PATH}-shm`;
+                    }
+
+                    if (targetPath) {
+                        fs.renameSync(file.path, targetPath);
+                        console.log(`Restored File: ${file.originalname} -> ${targetPath}`);
+                    } else {
+                        fs.unlinkSync(file.path);
+                    }
                 }
-            });
+            }
         }
 
-        // 4. Reopen connection
-        db = new Database(DB_PATH);
-        db.pragma('journal_mode = WAL');
+        // 4. Re-initialize DB
+        // This re-opens the connection AND ensures schemas exist if the restored file was somehow empty/missing
+        initDB();
         
         console.log("Database Restored Successfully.");
-        logAction(userId, 'ADMIN', 'Restored Database from Backup');
+        
+        // Log action (will fail if audit_logs table is missing, but initDB should have fixed that)
+        try {
+            logAction(userId, 'ADMIN', 'Restored Database from Backup');
+        } catch(e) {
+            console.error("Could not log restore action:", e.message);
+        }
 
         res.json({ success: true });
 
     } catch (e) {
         console.error("Import DB Error:", e);
-        try { if (!db.open) db = new Database(DB_PATH); } catch (err) {}
+        // Attempt recovery
+        try { initDB(); } catch (err) {}
         res.status(500).json({ error: e.message });
     }
 });
