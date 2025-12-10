@@ -11,7 +11,7 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("Starting gOwOrk Server (v1.0.2)...");
+console.log("Starting gOwOrk Server (v1.0.3)...");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1016,7 +1016,7 @@ app.delete('/api/admin/user/:id', (req, res) => {
 // Database Export Endpoint (Protected)
 app.post('/api/admin/export-db', async (req, res) => {
     try {
-        const { userId, password_hash } = req.body;
+        const { userId, password_hash, filename } = req.body;
         
         // Auth Check
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
@@ -1027,54 +1027,48 @@ app.post('/api/admin/export-db', async (req, res) => {
              return res.status(403).json({ error: "Unauthorized" });
         }
 
-        // --- EXPORT STRATEGY ---
-        // 1. Try to use 'archiver' to zip all DB files (wal/shm included)
-        // 2. If 'archiver' is missing (deployment issue), fallback to sending just the .db file raw.
-        
-        try {
-            const archiver = (await import('archiver')).default;
+        // MODE 1: Download specific file (if filename provided)
+        if (filename) {
+            const allowedFiles = [
+                path.basename(DB_PATH),
+                path.basename(DB_PATH) + '-wal',
+                path.basename(DB_PATH) + '-shm'
+            ];
             
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            res.attachment(`gowork_db_backup_${timestamp}.zip`);
-
-            const archive = archiver('zip', { zlib: { level: 9 } });
-
-            archive.on('error', function(err) {
-                console.error("Archive Error", err);
-                // If header not sent, try to send error, otherwise it crashes stream
-                if (!res.headersSent) res.status(500).send({error: err.message});
-            });
-
-            archive.pipe(res);
-
-            const files = [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`];
-            files.forEach(f => {
-                if (fs.existsSync(f)) {
-                    archive.file(f, { name: path.basename(f) });
-                }
-            });
-
-            archive.finalize();
-            logAction(userId, 'ADMIN', 'Exported Database Backup (ZIP)');
-
-        } catch (e) {
-            console.warn("Archiver module not found or failed. Falling back to raw file download.", e);
-            
-            // Fallback: Send the main DB file directly
-            if (fs.existsSync(DB_PATH)) {
-                res.download(DB_PATH, 'gowork_fallback.db', (err) => {
-                    if (err) console.error("File download failed", err);
-                });
-                logAction(userId, 'ADMIN', 'Exported Database Backup (Raw Fallback)');
-            } else {
-                res.status(500).json({ error: "Database file not found on server." });
+            // Security: Prevent directory traversal
+            if (!allowedFiles.includes(filename)) {
+                return res.status(400).json({ error: "Invalid filename requested" });
             }
+
+            const filePath = path.join(path.dirname(DB_PATH), filename);
+            if (!fs.existsSync(filePath)) {
+                return res.status(404).json({ error: "File not found" });
+            }
+
+            // Send file
+            return res.download(filePath, filename);
         }
+
+        // MODE 2: List available files (if no filename)
+        const availableFiles = [];
+        const baseName = path.basename(DB_PATH);
+        
+        // Check main db
+        if (fs.existsSync(DB_PATH)) availableFiles.push(baseName);
+        
+        // Check WAL/SHM (might not exist if db closed cleanly or not in WAL mode, but usually do in better-sqlite3)
+        if (fs.existsSync(DB_PATH + '-wal')) availableFiles.push(baseName + '-wal');
+        if (fs.existsSync(DB_PATH + '-shm')) availableFiles.push(baseName + '-shm');
+
+        res.json({ files: availableFiles });
+
+        // Only log action once per session ideally, but logging here is fine
+        logAction(userId, 'ADMIN', 'Listed Database Files for Export');
 
     } catch (e) {
         console.error("Export DB Error:", e);
         if (!res.headersSent) {
-            res.status(500).send({ error: "Failed to export database" });
+            res.status(500).send({ error: "Failed to process export request" });
         }
     }
 });

@@ -1,5 +1,6 @@
 
 
+
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -321,31 +322,52 @@ class GameService {
 
   async exportAttendanceCSV() { return ""; } // Legacy stub
   
-  // NEW: DB Export Protected
+  // NEW: DB Export Protected (No Archiver)
   async exportDatabase(password: string) {
       if (!this.user) return;
       
       const hash = await this.hashPassword(password);
       
-      const res = await fetch('/api/admin/export-db', {
+      // 1. Get the list of available files
+      const listRes = await fetch('/api/admin/export-db', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: this.user.id, password_hash: hash })
       });
 
-      if (!res.ok) {
+      if (!listRes.ok) {
           throw new Error("Export failed: Incorrect password or unauthorized.");
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gowork_db_backup_${new Date().toISOString()}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const { files } = await listRes.json();
+
+      if (!files || files.length === 0) {
+          throw new Error("No database files found.");
+      }
+
+      // 2. Download each file sequentially with a small delay to allow browser to handle multiple downloads
+      for (const filename of files) {
+          const fileRes = await fetch('/api/admin/export-db', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: this.user.id, password_hash: hash, filename: filename })
+          });
+
+          if (fileRes.ok) {
+              const blob = await fileRes.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+              
+              // Small delay between downloads
+              await new Promise(r => setTimeout(r, 800));
+          }
+      }
   }
 
   // Getters
