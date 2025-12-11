@@ -30,3 +30,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Ignore Logo Images (User Request)
+components/logos/*.png
+components/logos/*.jpg
+components/logos/*.jpeg
+components/logos/*.svg
+components/logos/*.gif
