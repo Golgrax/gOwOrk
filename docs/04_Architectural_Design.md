@@ -58,7 +58,7 @@ flowchart TD
     
     DB --> Response[Return Updated User JSON]
     Response --> UIClient[Client Updates Context]
-    UIClient --> Feedback[Show "Critical Hit" Animation]
+    UIClient --> Feedback[Show Critical Hit Animation]
 ```
 
 ## 4.4 Context Diagram
@@ -66,15 +66,19 @@ flowchart TD
 The diagram below defines the boundary of the entire system.
 
 ```mermaid
-contextDiagram
-    direction TB
-    actor Employee
-    actor Manager
-    system "gOwOrk System" as Sys
-    database "SQLite File (Server)" as DB
+flowchart TB
+    Employee((Employee))
+    Manager((Manager))
+    
+    subgraph SystemBoundary [gOwOrk System]
+        direction TB
+        Sys[Web Application]
+    end
+    
+    DB[(SQLite File)]
 
-    Employee --> Sys : HTTP / API Calls
-    Manager --> Sys : HTTP / API Calls
-    Sys --> DB : SQL Read/Write
-    DB --> Sys : Data Rows
+    Employee -- "HTTP / API Calls" --> Sys
+    Manager -- "HTTP / API Calls" --> Sys
+    Sys -- "SQL Read/Write" --> DB
+    DB -- "Data Rows" --> Sys
 ```
