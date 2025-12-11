@@ -1,24 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build Output
+dist/
+
+# Environment Variables
+.env
+.env.local
+
+# Database (SQLite)
+*.db
+*.db-wal
+*.db-shm
+
+# Server Uploads & Backups
+uploads/
+*.zip
+*.csv
+
 # Logs
-logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# OS Files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Ignore Logo Images (User Request)
+components/logos/*

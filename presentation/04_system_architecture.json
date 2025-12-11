@@ -1,0 +1,7 @@
+{
+  "slide_number": 4,
+  "theme": "The Tech Stack",
+  "concept": "The 3-Tier Architecture (Client, Server, Database) visualized.",
+  "user_notes": "Place the React, Node, and SQLite logos in the three glass containers.",
+  "ai_image_prompt": "An isometric technical diagram background in 3D voxel style. Three distinct floating platforms connected by glowing blue data cables. Platform 1 (Left) is a computer monitor. Platform 2 (Center) is a high-tech server rack with blinking lights. Platform 3 (Right) is a heavy, reinforced steel vault (representing the database). The background is a dark, cyber-grid pattern (Tron-like). Leave empty space above each platform for labels. Neon Cyan and Magenta lighting. No text."
+}
