@@ -12,6 +12,7 @@ To ensure a smooth operation for our users, the system must fulfill the followin
 3.  **Gamification Engine:** The backend must calculate and award Experience Points (XP) and Gold based on user actions. Leveling logic and currency management are enforced by the server.
 4.  **Shop & Inventory Management:** The system shall provide a marketplace for users to exchange virtual Gold for items. Transaction validation (checking gold balance) must occur on the server.
 5.  **Admin Dashboard:** The system must provide a dedicated interface for Managers to view team analytics, export data to CSV, manage user bans, and trigger global event modifiers.
+6.  **Security Monitoring:** The system shall provide a dashboard for Managers to visualize and manage local media streams (camera, microphone, and screen share) to simulate a security hub environment.
 
 ## 5.2 Non-Functional Requirements
 

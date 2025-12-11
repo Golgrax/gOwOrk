@@ -29,6 +29,7 @@ The core business objectives for the gOwOrk system are defined to address curren
 5.  **Interactive Gameplay:** Inclusion of Minigames (e.g., Coffee Rush), Boss Raids, and interactive 3D environments to maintain engagement.
 6.  **Admin Dashboard:** Tools for user management, disciplinary actions ("Smite/Ban"), data export (CSV), and global event management.
 7.  **Server-Side Persistence:** A Node.js backend using SQLite to securely store user data, ensuring cross-device access and preventing client-side tampering.
+8.  **Security Monitoring:** A dashboard for Managers to visualize local video and audio inputs (simulating security feeds) within the application context.
 
 ### Out-of-Scope
 *   **Real-world Payroll Processing:** The system exports data but does not handle direct bank transfers, tax calculations, or payslip generation.

@@ -17,14 +17,14 @@ The system interacts with two main user groups, each with distinct roles, needs,
 | User Profile | Role/Description | User Needs | Key System Interactions |
 | :--- | :--- | :--- | :--- |
 | **Employee (Hero)** | The primary end-user or staff member performing shift duties. | 1. A fun, non-intrusive way to log attendance.<br>2. Visual feedback for achievements.<br>3. Customization options for their avatar.<br>4. Mobile compatibility for on-the-go access. | • Clock In/Out<br>• Complete Daily Quests<br>• Purchase Shop Items<br>• Play Minigames<br>• Feed Pet/Companion |
-| **Manager (Admin)** | The administrator or store manager responsible for oversight. | 1. Accurate data for payroll processing.<br>2. Tools to correct attendance errors.<br>3. Ability to incentivize staff (Bonuses).<br>4. Overview of team morale (Health/XP). | • View Team Analytics<br>• Manage Users (Edit/Ban)<br>• Export CSV Data<br>• Trigger Global Events<br>• Backup/Restore Database |
+| **Manager (Admin)** | The administrator or store manager responsible for oversight. | 1. Accurate data for payroll processing.<br>2. Tools to correct attendance errors.<br>3. Ability to incentivize staff (Bonuses).<br>4. Overview of team morale (Health/XP). | • View Team Analytics<br>• Manage Users (Edit/Ban)<br>• Export CSV Data<br>• Trigger Global Events<br>• Backup/Restore Database<br>• Monitor Security Feeds |
 
 ## 3.3 Use Case Diagram
 
 The Use Case Diagram visually defines the **functional requirements** and **scope** of the system by illustrating the key interactions between the primary actors and the system's functionalities.
 
 *   **Employee Use Cases:** Login, Clock In/Out, Perform Work Action, Purchase Items & Customize, Play Minigame (Arcade).
-*   **Manager Use Cases:** Login, Manage Staff (Ban/Edit), View Analytics, Create Quests, Export Payroll CSV, Backup Database.
+*   **Manager Use Cases:** Login, Manage Staff (Ban/Edit), View Analytics, Create Quests, Export Payroll CSV, Backup Database, Monitor Security Feeds.
 
 ```mermaid
 flowchart LR
@@ -42,6 +42,7 @@ flowchart LR
         UC7(["View Analytics"])
         UC8(["Create Quests"])
         UC9(["Export Payroll CSV / Backup DB"])
+        UC10(["Monitor Security Feeds"])
     end
 
     E --> UC1
@@ -55,6 +56,7 @@ flowchart LR
     M --> UC7
     M --> UC8
     M --> UC9
+    M --> UC10
     M --> UC2
 ```
 

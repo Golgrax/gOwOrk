@@ -52,13 +52,14 @@ erDiagram
     users {
         TEXT id PK
         TEXT username
-        TEXT password_hash
         TEXT role
         INTEGER level
         INTEGER current_gold
         INTEGER current_xp
-        TEXT inventory_json
+        TEXT inventory
         TEXT pet_json
+        TEXT unlocked_skills
+        TEXT achievements
     }
 
     attendance_logs {
@@ -66,14 +67,16 @@ erDiagram
         TEXT user_id FK
         TEXT date
         TEXT time_in
-        TEXT time_out
         TEXT status
+        INTEGER xp_earned
     }
 
     active_quests {
         TEXT id PK
         TEXT title
         INTEGER reward_gold
+        INTEGER reward_xp
+        TEXT type
     }
 
     audit_logs {
@@ -86,17 +89,30 @@ erDiagram
 
 ## 6.4 Database Schema (SQL Structure)
 
-The system uses a relational SQLite database.
+The system uses a relational SQLite database. Below are the actual table definitions used by the backend.
 
 **Table: `users`**
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `id` | TEXT (UUID) | Unique Identifier |
 | `username` | TEXT | Login credential |
+| `password_hash` | TEXT | SHA-256 hashed password |
+| `name` | TEXT | Display Name |
 | `role` | TEXT | 'employee', 'manager', 'moderator' |
-| `avatar_json` | TEXT (JSON) | Stores Hat, Eyes, Clothing IDs |
+| `level` | INTEGER | Current RPG Level |
+| `current_xp` | INTEGER | Experience Points |
+| `current_gold` | INTEGER | Virtual Currency |
+| `current_hp` | INTEGER | Current Health Points |
+| `total_hp` | INTEGER | Max Health Points |
+| `streak` | INTEGER | Consecutive days worked |
+| `skill_points` | INTEGER | Points available for Skill Tree |
+| `kudos_received` | INTEGER | Social recognition count |
+| `is_banned` | BOOLEAN | Account suspension status |
+| `avatar_json` | TEXT (JSON) | Customization (Hat, Eyes, Clothing) |
 | `inventory` | TEXT (JSON) | List of owned Item IDs |
-| `pet_json` | TEXT (JSON) | Stores Pet Name, Hunger, Happiness |
+| `achievements` | TEXT (JSON) | List of unlocked Achievement IDs |
+| `unlocked_skills` | TEXT (JSON) | List of unlocked Skill IDs |
+| `pet_json` | TEXT (JSON) | Pet stats (Name, Hunger, Happiness) |
 
 **Table: `attendance_logs`**
 | Field | Type | Description |
@@ -105,15 +121,29 @@ The system uses a relational SQLite database.
 | `user_id` | TEXT | Foreign Key to User |
 | `date` | TEXT | Date of shift (YYYY-MM-DD) |
 | `time_in` | TEXT | Clock In Timestamp ISO |
+| `time_out` | TEXT | Clock Out Timestamp ISO |
 | `status` | TEXT | 'ontime', 'late', 'early_bird', 'critical_hit' |
+| `xp_earned` | INTEGER | XP awarded for this shift |
+
+**Table: `active_quests`**
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | TEXT | Unique Identifier |
+| `title` | TEXT | Quest Title |
+| `description` | TEXT | Quest Description |
+| `reward_gold` | INTEGER | Gold Reward |
+| `reward_xp` | INTEGER | XP Reward |
+| `type` | TEXT | 'Daily', 'Party', 'Urgent' |
+| `expires_at` | INTEGER | Expiration Timestamp |
 
 **Table: `audit_logs`**
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `id` | TEXT | Unique Identifier |
 | `user_id` | TEXT | User who performed action |
-| `action_type` | TEXT | 'SHOP', 'ADMIN', 'SYSTEM' |
+| `action_type` | TEXT | 'SHOP', 'ADMIN', 'SYSTEM', 'WORK', etc. |
 | `details` | TEXT | Human readable description |
+| `timestamp` | INTEGER | Time of action |
 
 ## 6.5 User Interface Design
 
