@@ -41,24 +41,54 @@ The system’s components interact and communicate using the following interface
 
 ## 4.3 User Flow Diagram (Clock-In)
 
-The diagram below illustrates the flow of data when a user clocks in, emphasizing the server-side validation.
+The diagram below details the complete logic flow for the "Clock-In" process, illustrating the validation steps, server-side calculations, and database transactions required to ensure data integrity and gamification accuracy.
 
 ```mermaid
 flowchart TD
-    Start([User Clicks Clock In]) --> UI[UI Sends Request]
-    UI --> API[POST /api/action/clock-in]
-    API --> Server{Server Receives}
+    %% Initial Action
+    Start([User Clicks 'Start Shift']) --> ClientRequest[Client: POST /api/action/clock-in]
+    ClientRequest --> ServerBoundary
+
+    %% Backend Logic Container
+    subgraph ServerBoundary [Server-Side Processing]
+        direction TB
+        AuthCheck{Valid Session?}
+        AuthCheck -- No --> Err403[Return 403 Forbidden]
+        AuthCheck -- Yes --> DupCheck{Already Clocked In?}
+        
+        DupCheck -- Yes --> ReturnExisting[Return Existing Log]
+        DupCheck -- No --> TimeLogic[Analyze Server Time]
+        
+        TimeLogic --> StatusDecision{Determine Status}
+        
+        %% Branching Logic
+        StatusDecision -- Before 08:00 --> Early[Early Bird: +20 XP]
+        StatusDecision -- Exact 08:00 --> Critical[Critical Hit: +50 XP]
+        StatusDecision -- After 08:15 --> Late[Late Penalty: -10 HP]
+        StatusDecision -- Else --> OnTime[Standard: +10 XP]
+        
+        %% Reconvergence
+        Early & Critical & Late & OnTime --> GameCalc[Apply Streak & Skill Multipliers]
+        GameCalc --> DBTrans[(SQLite Transaction:<br/>Insert Log & Update User)]
+    end
+
+    %% Response & Feedback
+    DBTrans --> Response[Return Updated User JSON]
+    Response --> UIUpdate[Client: Update GameContext]
+    UIUpdate --> Feedback{Check Status}
     
-    Server --> AuthCheck{Valid User?}
-    AuthCheck -- No --> Error[Return 404/403]
-    AuthCheck -- Yes --> TimeCheck{Analyze Time}
+    Feedback -- Critical --> AnimConfetti([Effect: Confetti & Shake])
+    Feedback -- Late --> AnimHurt([Effect: Damage Red Flash])
+    Feedback -- Normal --> AnimToast([Toast: 'Clocked In'])
+
+    %% Visual Styling
+    style Start fill:#f9f,stroke:#333,stroke-width:2px
+    style DBTrans fill:#eee,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style ServerBoundary fill:#f4f4f4,stroke:#666,stroke-dasharray: 5 5
     
-    TimeCheck -- Logic --> Calc[Calculate XP/Gold/Status]
-    Calc --> DB[(INSERT Log & UPDATE User)]
-    
-    DB --> Response[Return Updated User JSON]
-    Response --> UIClient[Client Updates Context]
-    UIClient --> Feedback[Show Critical Hit Animation]
+    style Critical fill:#ff9900,color:black,stroke:#333
+    style Early fill:#4ade80,color:black,stroke:#333
+    style Late fill:#f87171,color:white,stroke:#333
 ```
 
 ## 4.4 Context Diagram
