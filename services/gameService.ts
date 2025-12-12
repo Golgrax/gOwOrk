@@ -1,6 +1,3 @@
-
-
-
 import { User, Quest, AttendanceLog, ShopItem, UserRole, AvatarConfig, BossEvent, Achievement, WeatherType, Skill, TeamStats, GlobalModifiers, AuditLog, QuestSubmission, GameSettings, WheelPrize } from '../types';
 
 const SHOP_ITEMS: ShopItem[] = [
@@ -218,7 +215,7 @@ class GameService {
   }
 
   async rejectQuest(userId: string, questId: string) {
-      // Stub
+      await this.apiCall('/admin/reject-quest', 'POST', { userId, questId });
   }
 
   async deleteQuest(questId: string) {
