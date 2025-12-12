@@ -1,4 +1,4 @@
-
+[![Delete Environment (default settings)](https://github.com/Golgrax/gOwOrk/actions/workflows/delete-deployments.yml/badge.svg)](https://github.com/Golgrax/gOwOrk/actions/workflows/delete-deployments.yml)
 # gOwOrk 🛡️☕
 
 **gOwOrk** is a Gamified Attendance and Employee Engagement System designed for shift-based workplaces. It turns the mundane task of "Clocking In" into an RPG adventure, featuring a 3D voxel avatar, economy system, skill trees, and arcade minigames.
