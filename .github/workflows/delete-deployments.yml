@@ -1,15 +1,38 @@
-name: Delete Environment (default settings)
+name: Delete Environment (auto run)
 
 on:
-  delete:
-    branches-ignore:
-      - main
+  push: {}                    # runs on every commit/push
+  schedule:
+    - cron: '0 09 * * *'      # daily at 09:00 UTC (change cron for a different time)
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to delete (optional — overrides default)'
+        required: false
+        default: 'my-environment-name'
+
+permissions:
+  contents: read
+  deployments: write
 
 jobs:
   delete:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: strumwolf/delete-deployment-environment@v2
+      - name: Determine environment to delete
+        id: env
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.environment }}" ]; then
+            echo "ENV_NAME=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "ENV_NAME=my-environment-name" >> $GITHUB_ENV
+          fi
+          echo "Will delete environment: $ENV_NAME"
+
+      - name: Delete deployment environment
+        uses: strumwolf/delete-deployment-environment@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          environment: my-environment-name
+          token: ${{ secrets.TOKEN }}
+          environment: ${{ env.ENV_NAME }}
