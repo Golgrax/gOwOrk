@@ -859,6 +859,13 @@ app.post('/api/admin/approve-quest', (req, res) => {
     res.json({ success: true });
 });
 
+app.post('/api/admin/reject-quest', (req, res) => {
+    const { userId, questId } = req.body;
+    db.prepare('DELETE FROM completed_quests WHERE user_id = ? AND quest_id = ?').run(userId, questId);
+    logAction(userId, 'ADMIN', `Rejected Quest Submission: ${questId}`);
+    res.json({ success: true });
+});
+
 app.post('/api/admin/give-bonus', (req, res) => {
     const { userId, amount } = req.body;
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
@@ -1224,3 +1231,4 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+    
