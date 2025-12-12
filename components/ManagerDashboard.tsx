@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { RetroCard } from './RetroCard';
@@ -9,7 +7,7 @@ import { WeatherType, TeamStats, User, AuditLog, QuestSubmission } from '../type
 import { gameService } from '../services/gameService';
 
 export const ManagerDashboard: React.FC = () => {
-  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, exportDatabase, importDatabase, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user, toggleAutoWeather, isAutoWeather } = useGame();
+  const { createQuest, setWeather, weather, toggleOverdrive, isOverdrive, setTimeOffset, setMotd, motd, getTeamData, giveBonus, setGlobalEvent, globalModifiers, exportData, exportDatabase, importDatabase, toggleBan, updateUser, punishUser, deleteUserAccount, deleteAuditLog, clearAllAuditLogs, addToast, playSfx, approveQuest, rejectQuest, getPendingSubmissions, user } = useGame();
   const [activeTab, setActiveTab] = useState<'inbox' | 'control' | 'team' | 'manage' | 'logs'>('inbox');
   
   // Control State
@@ -399,12 +397,8 @@ export const ManagerDashboard: React.FC = () => {
                        <div className="space-y-4 md:col-span-2">
                            <div className="flex justify-between items-center border-b-2 border-black">
                                <h3 className="font-bold">World Weather</h3>
-                               <label className="flex items-center gap-2 text-xs font-bold uppercase cursor-pointer">
-                                   <input type="checkbox" checked={isAutoWeather} onChange={(e) => toggleAutoWeather(e.target.checked)} />
-                                   Auto-Schedule
-                               </label>
                            </div>
-                           <div className={`grid grid-cols-2 md:grid-cols-5 gap-2 ${isAutoWeather ? 'opacity-50 pointer-events-none' : ''}`}>
+                           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                {weatherOptions.map(opt => (
                                    <button
                                      key={opt.type}
@@ -418,7 +412,6 @@ export const ManagerDashboard: React.FC = () => {
                                    </button>
                                ))}
                            </div>
-                           {isAutoWeather && <div className="text-xs text-center font-bold text-blue-600">Auto-Weather is Active (Changes based on Server Time)</div>}
                        </div>
                    </div>
                </RetroCard>
